@@ -1,0 +1,46 @@
+name: Laravel CD (Auto Deploy)
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploying to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /home/nafis/apps/api.mohima.skin  
+
+            git reset --hard HEAD
+
+            # Code update
+            git pull origin develop
+
+            # Dependencies install (No-dev for production)
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+
+            # Database migrate
+            php artisan migrate --force
+
+            # Cache clear & Optimization
+            php artisan optimize:clear
+            php artisan optimize
+
+            php artisan storage:link || echo "Symbolic link already exists"
+
+            # Permissions set (Proyojon hole)
+            chmod -R 775 storage bootstrap/cache
+
+            sudo systemctl reload php8.5-fpm
+
+            echo "Deployment successful!"
