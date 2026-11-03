@@ -148,6 +148,7 @@ class PublishingBatchService
                 }
             }
 
+            $this->quotaService->settleBatchGlobalQuota($batch);
             $batch->update(['batch_status' => 'cancelled']);
             return $batch;
         });

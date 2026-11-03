@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
-use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class TenantUser extends Authenticatable
 {
-    use HasApiTokens, HasFactory, BelongsToTenant;
+    use HasApiTokens, HasFactory;
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     protected $fillable = [
         'tenant_id',

@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Route;
 // Public Admin Auth
 Route::post('login', [AuthController::class, 'login'])->name('login');
 
-// Protected Admin Routes (Guarded by auth:sanctum & admin.check)
-Route::middleware(['auth:sanctum', 'admin.check'])->group(function () {
+// Protected Admin Routes (Guarded by auth:admin & admin.check)
+Route::middleware(['auth:admin', 'admin.check'])->group(function () {
     // 1. Dashboard Overview
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 

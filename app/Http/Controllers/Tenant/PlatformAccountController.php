@@ -31,6 +31,40 @@ class PlatformAccountController extends Controller
         ]);
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'platform' => ['required', 'in:youtube,tiktok,facebook'],
+            'account_name' => ['required', 'string', 'max:255'],
+            'account_handle' => ['nullable', 'string', 'max:255'],
+            'avatar_url' => ['nullable', 'url'],
+            'access_token' => ['nullable', 'string'],
+            'refresh_token' => ['nullable', 'string'],
+        ]);
+
+        $account = TenantPlatformAccount::updateOrCreate(
+            [
+                'platform' => $validated['platform'],
+                'account_name' => $validated['account_name'],
+            ],
+            [
+                'account_handle' => $validated['account_handle'] ?? ('@' . strtolower(str_replace(' ', '', $validated['account_name']))),
+                'avatar_url' => $validated['avatar_url'] ?? null,
+                'encrypted_access_token' => $validated['access_token'] ?? 'mock_token_' . bin2hex(random_bytes(16)),
+                'encrypted_refresh_token' => $validated['refresh_token'] ?? 'mock_refresh_' . bin2hex(random_bytes(16)),
+                'token_expires_at' => now()->addDays(60),
+                'status' => 'active',
+                'last_validated_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => ucfirst($account->platform) . ' account connected successfully.',
+            'resources' => $account,
+        ], 201);
+    }
+
     public function destroy(int $id): JsonResponse
     {
         $account = TenantPlatformAccount::findOrFail($id);

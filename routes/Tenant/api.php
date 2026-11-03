@@ -10,8 +10,8 @@ use App\Http\Controllers\Tenant\SourceController;
 use App\Http\Controllers\Tenant\VideoController;
 use Illuminate\Support\Facades\Route;
 
-// Protected Tenant Routes (Guarded by auth:sanctum & tenant.check)
-Route::middleware(['auth:sanctum', 'tenant.check'])->group(function () {
+// Protected Tenant Routes (Guarded by auth:tenant & tenant.check)
+Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     // 1. Auth & Profile
     Route::get('me', [AuthController::class, 'me'])->name('me');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
@@ -34,6 +34,7 @@ Route::middleware(['auth:sanctum', 'tenant.check'])->group(function () {
 
     // 6. Connected Platform Accounts
     Route::get('platform-accounts', [PlatformAccountController::class, 'index'])->name('platform-accounts.index');
+    Route::post('platform-accounts', [PlatformAccountController::class, 'store'])->name('platform-accounts.store');
     Route::delete('platform-accounts/{id}', [PlatformAccountController::class, 'destroy'])->name('platform-accounts.destroy');
 
     // 7. Publishing & Batches

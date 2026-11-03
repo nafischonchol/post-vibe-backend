@@ -24,8 +24,11 @@ class UploadToPlatformJob implements ShouldQueue
         public PublishingSchedule $schedule
     ) {}
 
-    public function handle(PublishingQuotaService $quotaService, MediaStorageService $storage): void
-    {
+    public function handle(
+        PublishingQuotaService $quotaService,
+        MediaStorageService $storage,
+        \App\Services\Platform\PlatformGatewayManager $gatewayManager
+    ): void {
         // 1. Idempotency Check: Do not re-upload if already published
         if ($this->schedule->upload_status === 'published') {
             Log::info("PublishingSchedule ID {$this->schedule->id} is already published. Skipping.");
@@ -43,11 +46,16 @@ class UploadToPlatformJob implements ShouldQueue
             $metadata = $this->schedule->metadata;
             $account = $this->schedule->platformAccount;
 
-            // In production, execute the platform-specific OAuth upload driver:
-            // YouTubeGateway, TikTokGateway, FacebookGateway
-            // If running in development or account is mock, simulate successful upload:
-            $externalPostId = "ext_{$platform}_" . uniqid();
-            $externalPostUrl = "https://{$platform}.com/watch/{$externalPostId}";
+            if (!$account) {
+                throw new Exception("No linked {$platform} platform account attached to schedule.");
+            }
+
+            // Execute platform-specific OAuth gateway driver
+            $gateway = $gatewayManager->gateway($platform);
+            $result = $gateway->upload($account, $video, $metadata, $this->schedule);
+
+            $externalPostId = $result['external_post_id'];
+            $externalPostUrl = $result['external_post_url'];
 
             // 2. Mark Platform Schedule as Published
             $this->schedule->update([

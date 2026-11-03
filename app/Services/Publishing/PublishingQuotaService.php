@@ -67,13 +67,13 @@ class PublishingQuotaService
 
         // 1. Lock global usage row
         $globalUsage = TenantDailyQuotaUsage::where('tenant_id', $tenant->id)
-            ->where('quota_date', $quotaDate)
+            ->whereDate('quota_date', $quotaDate)
             ->lockForUpdate()
             ->firstOrFail();
 
         // 2. Lock selected platform usage rows in consistent order to prevent deadlocks
         $platformUsages = TenantPlatformDailyUsage::where('tenant_id', $tenant->id)
-            ->where('quota_date', $quotaDate)
+            ->whereDate('quota_date', $quotaDate)
             ->whereIn('platform', $platforms)
             ->orderBy('platform')
             ->lockForUpdate()
@@ -148,7 +148,7 @@ class PublishingQuotaService
     /**
      * Settle global batch quota: consumed if at least 1 platform succeeds; released if ALL permanently fail.
      */
-    protected function settleBatchGlobalQuota(PublishingBatch $batch): void
+    public function settleBatchGlobalQuota(PublishingBatch $batch): void
     {
         $reservation = QuotaReservation::where('publishing_batch_id', $batch->id)
             ->lockForUpdate()
@@ -164,7 +164,7 @@ class PublishingQuotaService
 
         $quotaDate = $batch->quota_date->toDateString();
         $globalUsage = TenantDailyQuotaUsage::where('tenant_id', $batch->tenant_id)
-            ->where('quota_date', $quotaDate)
+            ->whereDate('quota_date', $quotaDate)
             ->lockForUpdate()
             ->first();
 

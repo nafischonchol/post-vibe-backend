@@ -44,6 +44,23 @@ class MediaStorageService
     }
 
     /**
+     * Get binary content of stored media for uploading to external platform APIs.
+     */
+    public function getVideoBinary(?string $path): ?string
+    {
+        if (empty($path)) {
+            return null;
+        }
+
+        $disk = $this->getDisk();
+        if (Storage::disk($disk)->exists($path)) {
+            return Storage::disk($disk)->get($path);
+        }
+
+        return null;
+    }
+
+    /**
      * Delete temporary media file once publishing lifecycle is terminal.
      */
     public function deleteTemporaryMedia(string $path): bool
