@@ -48,9 +48,9 @@ return [
             'driver' => 'sanctum',
             'provider' => 'admins',
         ],
-        'client' => [
+        'tenant' => [
             'driver' => 'sanctum',
-            'provider' => 'clients',
+            'provider' => 'tenant_users',
         ],
     ],
 
@@ -80,9 +80,9 @@ return [
             'driver' => 'eloquent',
             'model' => Admin::class,
         ],
-        'clients' => [
+        'tenant_users' => [
             'driver' => 'eloquent',
-            'model' => Client::class,
+            'model' => \App\Models\TenantUser::class,
         ],
 
         // 'users' => [

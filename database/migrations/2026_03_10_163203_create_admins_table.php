@@ -17,8 +17,10 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->string('phone')->nullable();
+            $table->string('role', 30)->default('super_admin');
             $table->boolean('is_active')->default(true);
             $table->string('avatar')->nullable();
+            $table->timestamp('last_login_at')->nullable();
 
             $table->timestamps();
         });

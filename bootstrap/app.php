@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\HandleVisitorSession;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,22 +17,22 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function () {
             Route::middleware('api')
-                ->prefix('customer')
-                ->name('customer.')
-                ->group(base_path('routes/Customer/public.php'));
+                ->prefix('api/v1/tenant')
+                ->name('tenant.public.')
+                ->group(base_path('routes/Tenant/public.php'));
 
-            Route::middleware(['api', 'auth:sanctum', 'client.check'])
-                ->prefix('customer/me')
-                ->name('customer.me.')
-                ->group(base_path('routes/Customer/api.php'));
+            Route::middleware(['api', 'auth:sanctum', 'tenant.check'])
+                ->prefix('api/v1/tenant')
+                ->name('tenant.')
+                ->group(base_path('routes/Tenant/api.php'));
 
             Route::middleware('api')
-                ->prefix('admin')
+                ->prefix('api/v1/admin')
                 ->name('admin.')
                 ->group(base_path('routes/Admin/api.php'));
 
             Route::middleware('api')
-                ->prefix('webhooks')
+                ->prefix('api/v1/webhooks')
                 ->name('webhooks.')
                 ->group(base_path('routes/webhooks.php'));
         },
@@ -41,12 +40,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->api(append: [
-            HandleVisitorSession::class,
             ThrottleRequests::class.':api',
         ]);
         $middleware->alias([
             'admin.check' => \App\Http\Middleware\VerifyAdminToken::class,
-            'client.check' => \App\Http\Middleware\VerifyClientToken::class,
+            'tenant.check' => \App\Http\Middleware\VerifyTenantToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

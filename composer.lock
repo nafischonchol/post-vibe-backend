@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c0a223ce4c50a72873be3f97ea72981",
+    "content-hash": "96185e17179228a0872ff958c59e2a60",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -156,76 +156,6 @@
                 "source": "https://github.com/aws/aws-sdk-php/tree/3.393.0"
             },
             "time": "2026-08-17T19:27:01+00:00"
-        },
-        {
-            "name": "bonik/courier",
-            "version": "v1.0.4",
-            "source": {
-                "type": "git",
-                "url": "git@github.com:Bonik-OS/bd-courier.git",
-                "reference": "6f8ed6696aa59d324a84b8511fc8322864de0863"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Bonik-OS/bd-courier/zipball/6f8ed6696aa59d324a84b8511fc8322864de0863",
-                "reference": "6f8ed6696aa59d324a84b8511fc8322864de0863",
-                "shasum": ""
-            },
-            "require": {
-                "illuminate/http": "^10.0 || ^11.0 || ^12.0",
-                "illuminate/support": "^10.0 || ^11.0 || ^12.0",
-                "php": "^8.3"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Bonik\\Courier\\Providers\\CourierServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Bonik\\Courier\\": "src/"
-                }
-            },
-            "license": [
-                "GPL-3.0-only"
-            ],
-            "authors": [
-                {
-                    "name": "Bonik Dev Team",
-                    "email": "chonchol@alzaf.com"
-                }
-            ],
-            "description": "A comprehensive Laravel package for fraud detection, parcel booking, live order tracking, and webhook management across Bangladeshi couriers: Steadfast, Pathao, Redx, and CarryBee.",
-            "keywords": [
-                "API integration",
-                "Laravel fraud checker",
-                "Laravel package",
-                "courier",
-                "customer behavior",
-                "delivery",
-                "delivery tracking",
-                "e-commerce",
-                "e-commerce fraud",
-                "fraud checker",
-                "fraud detection",
-                "fraud prevention",
-                "order cancellation",
-                "order management",
-                "order status",
-                "order tracking",
-                "order verification",
-                "pathao",
-                "shipping",
-                "steadfast courier"
-            ],
-            "support": {
-                "source": "https://github.com/Bonik-OS/bd-courier/tree/v1.0.4",
-                "issues": "https://github.com/Bonik-OS/bd-courier/issues"
-            },
-            "time": "2026-08-18T18:16:22+00:00"
         },
         {
             "name": "brick/math",
