@@ -22,7 +22,7 @@ class OptimizeExistingImages extends Command
      *
      * @var string
      */
-    protected $description = 'Scan existing images (products, banners, categories, brands, store setup) and convert to WebP (<200KB)';
+    protected $description = 'Scan existing images (thumbnails, avatars, assets) and convert to WebP (<200KB)';
 
     /**
      * Execute the console command.
@@ -35,19 +35,9 @@ class OptimizeExistingImages extends Command
         $this->info("Scanning images on disk: {$disk} (sync: " . ($sync ? 'yes' : 'no') . ")...");
 
         $targets = [
-            ['products', 'image'],
-            ['products', 'meta_image'],
-            ['product_images', 'image_path'],
-            ['banners', 'banner_image'],
-            ['banners', 'mobile_banner_image'],
-            ['categories', 'meta_image'],
-            ['categories', 'icon'],
-            ['categories', 'banners'],
-            ['brands', 'meta_image'],
-            ['brands', 'icon'],
-            ['brands', 'banners'],
-            ['store_setups', 'logo'],
-            ['attribute_values', 'image'],
+            ['videos', 'thumbnail_url'],
+            ['tenant_platform_accounts', 'avatar_url'],
+            ['admins', 'avatar'],
         ];
 
         $paths = collect();

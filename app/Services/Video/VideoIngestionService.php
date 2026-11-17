@@ -9,6 +9,51 @@ use Illuminate\Support\Str;
 
 class VideoIngestionService
 {
+    public function __construct(
+        protected VideoScraperService $scraper
+    ) {}
+
+    /**
+     * Ingest and scrape a video from a direct URL.
+     */
+    public function ingestFromUrl(int $tenantId, string $url, ?int $sourceId = null): Video
+    {
+        $scraped = $this->scraper->scrape($url);
+
+        // 1. Check duplicate within tenant
+        $existing = Video::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('source_post_id', $scraped['source_post_id'])
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        // 2. Create Video Record
+        $video = Video::create([
+            'tenant_id' => $tenantId,
+            'source_id' => $sourceId,
+            'source_platform' => $scraped['platform'],
+            'source_post_id' => $scraped['source_post_id'],
+            'source_post_url' => $scraped['source_post_url'],
+            'original_caption' => $scraped['original_caption'],
+            'original_hashtags' => $scraped['original_hashtags'],
+            'thumbnail_url' => $scraped['thumbnail_url'],
+            'duration' => $scraped['duration'],
+            'source_published_at' => $scraped['source_published_at'],
+            'processing_status' => 'discovered',
+        ]);
+
+        // 3. Dispatch download & processing
+        $mediaUrl = $scraped['download_url'] ?? $scraped['source_post_url'];
+        if ($mediaUrl) {
+            DownloadAndStoreVideoJob::dispatch($video, $mediaUrl);
+        }
+
+        return $video;
+    }
+
     /**
      * Ingest a discovered video record and dispatch download/processing.
      */
@@ -25,13 +70,9 @@ class VideoIngestionService
             return $existing;
         }
 
-        // 2. Extract hashtags from caption
+        // 2. Extract hashtags from caption if not provided
         $caption = $postData['original_caption'] ?? '';
-        $hashtags = [];
-        if (! empty($caption)) {
-            preg_match_all('/#([\p{L}\p{N}_]+)/u', $caption, $matches);
-            $hashtags = array_unique($matches[1] ?? []);
-        }
+        $hashtags = $postData['original_hashtags'] ?? $this->scraper->extractHashtags($caption);
 
         // 3. Create Video Record
         $video = Video::create([

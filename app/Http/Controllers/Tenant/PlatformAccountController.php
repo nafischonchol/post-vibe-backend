@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\PlatformAccount\StorePlatformAccountRequest;
 use App\Models\TenantPlatformAccount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,22 +26,12 @@ class PlatformAccountController extends Controller
             ];
         });
 
-        return response()->json([
-            'status' => 'success',
-            'resources' => $accounts,
-        ]);
+        return responseSuccess($accounts, 'Platform accounts retrieved successfully');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePlatformAccountRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'platform' => ['required', 'in:youtube,tiktok,facebook'],
-            'account_name' => ['required', 'string', 'max:255'],
-            'account_handle' => ['nullable', 'string', 'max:255'],
-            'avatar_url' => ['nullable', 'url'],
-            'access_token' => ['nullable', 'string'],
-            'refresh_token' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $account = TenantPlatformAccount::updateOrCreate(
             [
@@ -58,11 +49,11 @@ class PlatformAccountController extends Controller
             ]
         );
 
-        return response()->json([
-            'status' => 'success',
-            'message' => ucfirst($account->platform) . ' account connected successfully.',
-            'resources' => $account,
-        ], 201);
+        return responseSuccess(
+            $account,
+            ucfirst($account->platform) . ' account connected successfully.',
+            201
+        );
     }
 
     public function destroy(int $id): JsonResponse
@@ -70,9 +61,6 @@ class PlatformAccountController extends Controller
         $account = TenantPlatformAccount::findOrFail($id);
         $account->delete();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Social platform account disconnected.',
-        ]);
+        return responseSuccess(null, 'Social platform account disconnected.');
     }
 }

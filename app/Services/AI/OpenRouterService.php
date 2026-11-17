@@ -74,7 +74,7 @@ class OpenRouterService implements AiServiceInterface
         $timeout = $options['timeout'] ?? 30;
 
         $siteUrl = config('services.openrouter.site_url', 'http://localhost:3000');
-        $siteName = config('services.openrouter.site_name', 'Mohima Beauty');
+        $siteName = config('services.openrouter.site_name', 'Post Vibe');
 
         $payload = [
             'model' => $model,
@@ -673,7 +673,7 @@ PROMPT;
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $keyToTest,
                 'HTTP-Referer' => config('services.openrouter.site_url', 'http://localhost:3000'),
-                'X-Title' => config('services.openrouter.site_name', 'Mohima Beauty'),
+                'X-Title' => config('services.openrouter.site_name', 'Post Vibe'),
                 'Content-Type' => 'application/json',
             ])->timeout(15)->post($this->baseUrl . '/chat/completions', [
                 'model' => $modelToTest,

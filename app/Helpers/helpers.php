@@ -4,7 +4,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-function responseSuccess($data, $message = 'Success', $code = 200)
+function responseSuccess($data, string $message = 'Success', int $code = 200, $meta = null)
 {
     $items = $data;
     if (is_array($data) && isset($data['items'])) {
@@ -16,10 +16,18 @@ function responseSuccess($data, $message = 'Success', $code = 200)
         'success' => true,
         'message' => $message,
         'resources' => $items,
+        'data' => $items,
     ];
 
-    if (is_array($data) && isset($data['pagination'])) {
+    if ($meta) {
+        $response['meta'] = $meta;
+        $response['pagination'] = $meta;
+    } elseif (is_array($data) && isset($data['pagination'])) {
         $response['pagination'] = $data['pagination'];
+        $response['meta'] = $data['pagination'];
+    } elseif (is_array($data) && isset($data['meta'])) {
+        $response['meta'] = $data['meta'];
+        $response['pagination'] = $data['meta'];
     }
 
     if (is_array($data) && isset($data['summary'])) {
@@ -45,20 +53,23 @@ function responseError(string $message, string|int|null $code = 500, $exception 
         $message = 'Resource not found.';
     }
 
-    Log::error($exception);
-    if (! is_int($code)) {
-        $code = 500;
-    } elseif ($code < 100 || $code >= 600) {
+    if ($exception) {
+        Log::error($exception);
+    }
+
+    if (! is_int($code) || $code < 100 || $code >= 600) {
         $code = 500;
     }
 
     $response = [
+        'status' => 'error',
         'success' => false,
         'message' => $message,
     ];
 
     if ($data) {
         $response['error'] = $data;
+        $response['errors'] = $data;
     }
 
     return response()->json($response, $code);

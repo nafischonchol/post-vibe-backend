@@ -2,72 +2,56 @@
 
 namespace App\Services\Admin;
 
-use App\Http\Requests\Admin\User\StoreUserRequest;
-use App\Http\Requests\Admin\User\UpdateUserRequest;
-use App\Http\Resources\AdminUserResource;
 use App\Models\Admin;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Hash;
 
 class UserService
 {
-    public function index()
+    public function listUsers(): Collection
     {
-        $users = Admin::latest()->get();
-
-        return responseSuccess(AdminUserResource::collection($users), 'Users fetched successfully');
+        return Admin::latest()->get();
     }
 
-    public function show(string $id)
+    public function findUser(string|int $id): Admin
     {
-        $user = Admin::findOrFail($id);
-
-        return responseSuccess(AdminUserResource::make($user), 'User details fetched successfully');
+        return Admin::findOrFail($id);
     }
 
-    public function store(StoreUserRequest $request)
+    public function createUser(array $data, bool $isActive = true): Admin
     {
-        $validated = $request->validated();
-
-        $user = Admin::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'phone' => $validated['phone'] ?? null,
-            'is_active' => $request->boolean('is_active', true),
+        return Admin::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'phone' => $data['phone'] ?? null,
+            'is_active' => $isActive,
         ]);
-
-        return responseSuccess(AdminUserResource::make($user), 'User created successfully', 201);
     }
 
-    public function update(string $id, UpdateUserRequest $request)
+    public function updateUser(Admin $user, array $data, ?bool $isActive = null): Admin
     {
-        $user = Admin::findOrFail($id);
-        $validated = $request->validated();
-
         $updateData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
         ];
 
-        if ($request->has('is_active')) {
-            $updateData['is_active'] = $request->boolean('is_active');
+        if ($isActive !== null) {
+            $updateData['is_active'] = $isActive;
         }
 
-        if (! empty($validated['password'])) {
-            $updateData['password'] = Hash::make($validated['password']);
+        if (! empty($data['password'])) {
+            $updateData['password'] = Hash::make($data['password']);
         }
 
         $user->update($updateData);
 
-        return responseSuccess(AdminUserResource::make($user->fresh()), 'User updated successfully');
+        return $user->fresh();
     }
 
-    public function destroy(string $id)
+    public function deleteUser(Admin $user): bool
     {
-        $user = Admin::findOrFail($id);
-        $user->delete();
-
-        return responseSuccess(null, 'User deleted successfully');
+        return (bool) $user->delete();
     }
 }

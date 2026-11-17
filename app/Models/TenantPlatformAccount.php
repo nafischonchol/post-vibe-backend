@@ -47,6 +47,6 @@ class TenantPlatformAccount extends Model
             return false;
         }
 
-        return $this->token_expires_at->subMinutes($minutes)->isPast();
+        return $this->token_expires_at->lte(now()->addMinutes($minutes));
     }
 }

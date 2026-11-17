@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Source\StoreVideoSourceRequest;
 use App\Models\VideoSource;
+use App\Services\Video\VideoIngestionService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,29 +16,15 @@ class SourceController extends Controller
     {
         $sources = VideoSource::withCount('videos')->latest()->get();
 
-        return response()->json([
-            'status' => 'success',
-            'resources' => $sources,
-        ]);
+        return responseSuccess($sources, 'Video sources retrieved successfully');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreVideoSourceRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'platform' => ['required', 'string', 'in:instagram,facebook,youtube,tiktok'],
-            'source_identifier' => ['required', 'string'],
-            'source_url' => ['required', 'url'],
-            'name' => ['required', 'string', 'max:255'],
-            'scan_frequency' => ['nullable', 'integer', 'min:15', 'max:1440'],
-        ]);
-
+        $validated = $request->validated();
         $source = VideoSource::create($validated);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Video source added successfully.',
-            'resources' => $source,
-        ], 201);
+        return responseSuccess($source, 'Video source added successfully.', 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -65,5 +54,33 @@ class SourceController extends Controller
             'status' => 'success',
             'message' => 'Video source deleted.',
         ]);
+    }
+
+    /**
+     * Scrape a video directly from social URL and queue for syndication pipeline.
+     */
+    public function scrapeAndIngest(Request $request, VideoIngestionService $ingestionService): JsonResponse
+    {
+        $validated = $request->validate([
+            'url' => ['required', 'url'],
+            'source_id' => ['nullable', 'exists:video_sources,id'],
+        ]);
+
+        $tenantId = $request->user()->tenant_id;
+
+        try {
+            $video = $ingestionService->ingestFromUrl($tenantId, $validated['url'], $validated['source_id'] ?? null);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Video scraped and queued for syndication processing.',
+                'resources' => $video,
+            ], 201);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to scrape video: ' . $e->getMessage(),
+            ], 422);
+        }
     }
 }

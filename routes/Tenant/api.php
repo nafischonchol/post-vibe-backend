@@ -20,6 +20,7 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // 3. Video Sources
+    Route::post('sources/scrape-video', [SourceController::class, 'scrapeAndIngest'])->name('sources.scrape');
     Route::apiResource('sources', SourceController::class);
 
     // 4. Video Management
@@ -36,6 +37,7 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     Route::get('platform-accounts', [PlatformAccountController::class, 'index'])->name('platform-accounts.index');
     Route::post('platform-accounts', [PlatformAccountController::class, 'store'])->name('platform-accounts.store');
     Route::delete('platform-accounts/{id}', [PlatformAccountController::class, 'destroy'])->name('platform-accounts.destroy');
+    Route::get('platform-accounts/oauth/{platform}/redirect', [\App\Http\Controllers\Api\OAuthController::class, 'redirect'])->name('platform-accounts.oauth.redirect');
 
     // 7. Publishing & Batches
     Route::get('publishing/batches', [PublishingController::class, 'index'])->name('publishing.batches.index');

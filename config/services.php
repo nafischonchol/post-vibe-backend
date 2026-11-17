@@ -38,7 +38,7 @@ return [
 
     'openrouter' => [
         'site_url' => env('APP_URL', 'http://localhost:3000'),
-        'site_name' => env('APP_NAME', 'Mohima Beauty'),
+        'site_name' => env('APP_NAME', 'Post Vibe'),
     ],
 
 ];

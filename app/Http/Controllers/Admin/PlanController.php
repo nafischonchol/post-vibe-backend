@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Plan\StorePlanRequest;
 use App\Models\Plan;
 use App\Models\PlanPlatformQuota;
 use Illuminate\Http\JsonResponse;
@@ -16,26 +17,12 @@ class PlanController extends Controller
     {
         $plans = Plan::with('platformQuotas')->get();
 
-        return response()->json([
-            'status' => 'success',
-            'resources' => $plans,
-        ]);
+        return responseSuccess($plans, 'Plans retrieved successfully');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePlanRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'price_monthly' => ['required', 'numeric', 'min:0'],
-            'price_yearly' => ['required', 'numeric', 'min:0'],
-            'global_daily_quota' => ['required', 'integer', 'min:1'],
-            'team_member_limit' => ['required', 'integer', 'min:1'],
-            'storage_limit_mb' => ['required', 'integer', 'min:100'],
-            'features' => ['nullable', 'array'],
-            'platform_quotas' => ['nullable', 'array'],
-            'platform_quotas.*.platform' => ['required', 'string'],
-            'platform_quotas.*.daily_quota' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $plan = DB::transaction(function () use ($validated) {
             $plan = Plan::create([

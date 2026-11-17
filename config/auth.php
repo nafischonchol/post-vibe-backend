@@ -1,8 +1,7 @@
 <?php
 
 use App\Models\Admin;
-use App\Models\Client;
-use App\Models\User;
+use App\Models\TenantUser;
 
 return [
 
@@ -74,7 +73,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'model' => env('AUTH_MODEL', TenantUser::class),
         ],
         'admins' => [
             'driver' => 'eloquent',
@@ -82,7 +81,7 @@ return [
         ],
         'tenant_users' => [
             'driver' => 'eloquent',
-            'model' => \App\Models\TenantUser::class,
+            'model' => TenantUser::class,
         ],
 
         // 'users' => [

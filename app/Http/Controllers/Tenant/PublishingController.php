@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Publishing\StorePublishingBatchRequest;
 use App\Models\PublishingBatch;
 use App\Models\Video;
 use App\Services\Publishing\PublishingBatchService;
@@ -23,27 +24,17 @@ class PublishingController extends Controller
             ->latest()
             ->paginate($request->query('per_page', 15));
 
-        return response()->json([
-            'status' => 'success',
-            'resources' => $batches->items(),
-            'meta' => [
-                'current_page' => $batches->currentPage(),
-                'last_page' => $batches->lastPage(),
-                'per_page' => $batches->perPage(),
-                'total' => $batches->total(),
-            ],
-        ]);
+        return responseSuccess(
+            $batches->items(),
+            'Publishing batches retrieved successfully',
+            200,
+            pagination($batches)
+        );
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePublishingBatchRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'video_id' => ['required', 'exists:videos,id'],
-            'targets' => ['required', 'array', 'min:1'],
-            'targets.*.platform' => ['required', 'string', 'in:youtube,tiktok,facebook'],
-            'targets.*.account_id' => ['nullable', 'exists:tenant_platform_accounts,id'],
-            'scheduled_at' => ['nullable', 'date'],
-        ]);
+        $validated = $request->validated();
 
         $video = Video::findOrFail($validated['video_id']);
         $tenant = $request->user()->tenant;
@@ -59,17 +50,14 @@ class PublishingController extends Controller
                 $request->user()
             );
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Publishing batch created and quotas reserved.',
-                'resources' => $batch,
-            ], 201);
+            return responseSuccess(
+                $batch,
+                'Publishing batch created and quotas reserved.',
+                201
+            );
 
         } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 422);
+            return responseError($e->getMessage(), 422, $e);
         }
     }
 
