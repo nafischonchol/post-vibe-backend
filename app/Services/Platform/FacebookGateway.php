@@ -27,13 +27,8 @@ class FacebookGateway implements PlatformGatewayInterface
         $account = $this->refreshToken($account);
         $accessToken = $account->encrypted_access_token;
 
-        if (str_starts_with($accessToken, 'mock_') || empty($accessToken)) {
-            $reelId = 'fb_' . substr(md5(uniqid()), 0, 14);
-            return [
-                'external_post_id' => $reelId,
-                'external_post_url' => "https://facebook.com/reel/{$reelId}",
-                'raw' => ['simulated' => true, 'platform' => 'facebook'],
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('Facebook credentials are missing or invalid. Provide a real OAuth access token.');
         }
 
         // Facebook Graph API v20.0 Reels Publishing Flow
@@ -95,12 +90,8 @@ class FacebookGateway implements PlatformGatewayInterface
     public function reconcile(TenantPlatformAccount $account, string $externalPostId): array
     {
         $accessToken = $account->encrypted_access_token;
-        if (str_starts_with($accessToken, 'mock_')) {
-            return [
-                'published' => true,
-                'external_post_id' => $externalPostId,
-                'external_post_url' => "https://facebook.com/reel/{$externalPostId}",
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('Facebook credentials are missing or invalid.');
         }
 
         $res = Http::get("https://graph.facebook.com/v20.0/{$externalPostId}?fields=status&access_token={$accessToken}");

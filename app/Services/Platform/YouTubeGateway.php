@@ -28,14 +28,8 @@ class YouTubeGateway implements PlatformGatewayInterface
         $account = $this->refreshToken($account);
         $accessToken = $account->encrypted_access_token;
 
-        // If credentials are mock/testing, return simulated response
-        if (str_starts_with($accessToken, 'mock_') || empty($accessToken)) {
-            $id = 'yt_' . substr(md5(uniqid()), 0, 11);
-            return [
-                'external_post_id' => $id,
-                'external_post_url' => "https://youtube.com/shorts/{$id}",
-                'raw' => ['simulated' => true, 'platform' => 'youtube'],
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('YouTube credentials are missing or invalid. Provide a real OAuth access token.');
         }
 
         // Production YouTube Data API v3 Resumable Upload Flow
@@ -101,12 +95,8 @@ class YouTubeGateway implements PlatformGatewayInterface
     public function reconcile(TenantPlatformAccount $account, string $externalPostId): array
     {
         $accessToken = $account->encrypted_access_token;
-        if (str_starts_with($accessToken, 'mock_')) {
-            return [
-                'published' => true,
-                'external_post_id' => $externalPostId,
-                'external_post_url' => "https://youtube.com/shorts/{$externalPostId}",
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('YouTube credentials are missing or invalid.');
         }
 
         $res = Http::withToken($accessToken)

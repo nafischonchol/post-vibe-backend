@@ -27,13 +27,8 @@ class TikTokGateway implements PlatformGatewayInterface
         $account = $this->refreshToken($account);
         $accessToken = $account->encrypted_access_token;
 
-        if (str_starts_with($accessToken, 'mock_') || empty($accessToken)) {
-            $publishId = 'tt_' . substr(md5(uniqid()), 0, 12);
-            return [
-                'external_post_id' => $publishId,
-                'external_post_url' => "https://tiktok.com/@{$account->account_handle}/video/{$publishId}",
-                'raw' => ['simulated' => true, 'platform' => 'tiktok'],
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('TikTok credentials are missing or invalid. Provide a real OAuth access token.');
         }
 
         // TikTok Content Posting API v2
@@ -95,12 +90,8 @@ class TikTokGateway implements PlatformGatewayInterface
     public function reconcile(TenantPlatformAccount $account, string $externalPostId): array
     {
         $accessToken = $account->encrypted_access_token;
-        if (str_starts_with($accessToken, 'mock_')) {
-            return [
-                'published' => true,
-                'external_post_id' => $externalPostId,
-                'external_post_url' => "https://tiktok.com/@{$account->account_handle}/video/{$externalPostId}",
-            ];
+        if (empty($accessToken) || str_starts_with($accessToken, 'mock_')) {
+            throw new Exception('TikTok credentials are missing or invalid.');
         }
 
         $res = Http::withHeaders([

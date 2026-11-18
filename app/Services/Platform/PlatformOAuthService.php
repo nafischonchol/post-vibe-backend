@@ -32,11 +32,7 @@ class PlatformOAuthService
 
         // If credentials are not configured or simulated, return fallback simulation endpoint
         if (! $app || empty($app->client_id) || empty($app->encrypted_client_secret) || str_starts_with($app->client_id, 'mock_')) {
-            return route('oauth.callback', [
-                'platform' => $platform,
-                'code' => 'mock_auth_code_' . Str::random(24),
-                'state' => $state,
-            ]);
+            throw new Exception("OAuth application credentials for {$platform} are not configured.");
         }
 
         return match ($platform) {
@@ -62,9 +58,9 @@ class PlatformOAuthService
         $app = PlatformApplication::where('platform', $platform)->first();
         $redirectUri = $app?->redirect_uri ?: route('oauth.callback', ['platform' => $platform]);
 
-        // Simulated / Local Fallback Flow
-        if (str_starts_with($code, 'mock_auth_code_') || ! $app || empty($app->client_id) || empty($app->encrypted_client_secret)) {
-            return $this->createMockAccount($tenantId, $platform);
+        // Live provider callback only. Simulated callbacks are not accepted.
+        if (str_starts_with($code, 'mock_auth_code_') || ! $app || empty($app->client_id) || empty($app->encrypted_client_secret) || str_starts_with($app->client_id, 'mock_')) {
+            throw new Exception("{$platform} OAuth credentials are missing or invalid.");
         }
 
         // Live Provider Exchange Flow
@@ -272,38 +268,6 @@ class PlatformOAuthService
                 'encrypted_refresh_token' => $longLivedToken,
                 'token_expires_at' => now()->addSeconds($expiresIn),
                 'scopes' => ['pages_show_list', 'publish_video'],
-                'status' => 'active',
-                'last_validated_at' => now(),
-            ]
-        );
-
-        return ['status' => 'success', 'account' => $account];
-    }
-
-    protected function createMockAccount(int $tenantId, string $platform): array
-    {
-        $platformNames = [
-            'youtube' => ['name' => 'YouTube Channel Official', 'handle' => '@postvibe_yt', 'avatar' => 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150'],
-            'tiktok' => ['name' => 'PostVibe Shorts', 'handle' => '@postvibe_tiktok', 'avatar' => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'],
-            'facebook' => ['name' => 'Post Vibe Media Page', 'handle' => '@postvibepage', 'avatar' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'],
-        ];
-
-        $info = $platformNames[$platform] ?? ['name' => ucfirst($platform) . ' Account', 'handle' => '@' . $platform, 'avatar' => null];
-
-        $account = TenantPlatformAccount::withoutGlobalScopes()->updateOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'platform' => $platform,
-                'account_name' => $info['name'],
-            ],
-            [
-                'external_account_id' => $platform . '_' . Str::random(12),
-                'account_handle' => $info['handle'],
-                'avatar_url' => $info['avatar'],
-                'encrypted_access_token' => 'mock_access_' . Str::random(32),
-                'encrypted_refresh_token' => 'mock_refresh_' . Str::random(32),
-                'token_expires_at' => now()->addDays(60),
-                'scopes' => ['read', 'publish'],
                 'status' => 'active',
                 'last_validated_at' => now(),
             ]

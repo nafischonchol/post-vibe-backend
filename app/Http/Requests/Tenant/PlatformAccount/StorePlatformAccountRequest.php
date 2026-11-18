@@ -13,8 +13,8 @@ class StorePlatformAccountRequest extends BaseFormRequest
             'account_name' => ['required', 'string', 'max:255'],
             'account_handle' => ['nullable', 'string', 'max:255'],
             'avatar_url' => ['nullable', 'url'],
-            'access_token' => ['nullable', 'string'],
-            'refresh_token' => ['nullable', 'string'],
+            'access_token' => ['required', 'string', 'min:10', 'not_regex:/^mock_/i'],
+            'refresh_token' => ['nullable', 'string', 'min:10', 'not_regex:/^mock_/i'],
         ];
     }
 }
