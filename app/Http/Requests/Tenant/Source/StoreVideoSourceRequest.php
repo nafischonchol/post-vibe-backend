@@ -10,7 +10,7 @@ class StoreVideoSourceRequest extends BaseFormRequest
     {
         return [
             'platform' => ['required', 'string', 'in:instagram,facebook,youtube,tiktok,generic'],
-            'source_identifier' => ['required', 'string'],
+            'source_identifier' => ['nullable', 'string'],
             'source_url' => ['required', 'url'],
             'name' => ['required', 'string', 'max:255'],
             'scan_frequency' => ['nullable', 'integer', 'min:15', 'max:1440'],
