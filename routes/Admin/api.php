@@ -30,7 +30,9 @@ Route::middleware(['auth:admin', 'admin.check'])->group(function () {
     Route::get('tenants', [TenantController::class, 'index'])->name('tenants.index');
     Route::post('tenants', [TenantController::class, 'store'])->name('tenants.store');
     Route::get('tenants/{id}', [TenantController::class, 'show'])->name('tenants.show');
-    Route::put('tenants/{id}', [TenantController::class, 'update'])->name('tenants.update');
+    Route::match(['put', 'patch'], 'tenants/{id}', [TenantController::class, 'update'])->name('tenants.update');
+    Route::post('tenants/{id}/approve', [TenantController::class, 'approve'])->name('tenants.approve');
+    Route::post('tenants/{id}/reject', [TenantController::class, 'reject'])->name('tenants.reject');
     Route::post('tenants/{id}/suspend', [TenantController::class, 'suspend'])->name('tenants.suspend');
     Route::post('tenants/{id}/activate', [TenantController::class, 'activate'])->name('tenants.activate');
     Route::post('tenants/{id}/quota-override', [TenantController::class, 'setQuotaOverride'])->name('tenants.quota-override');

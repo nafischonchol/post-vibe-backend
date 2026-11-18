@@ -68,9 +68,11 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($id);
         $validated = $request->validate([
-            'name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'string', 'email', "unique:tenants,email,{$id}"],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'string', 'email', "unique:tenants,email,{$id}"],
             'timezone' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'string', 'in:active,suspended,pending,rejected'],
+            'plan_id' => ['nullable', 'exists:plans,id'],
         ]);
 
         $tenant = $this->tenantService->updateTenant($tenant, $validated);
@@ -79,6 +81,30 @@ class TenantController extends Controller
             'status' => 'success',
             'message' => 'Tenant updated successfully.',
             'resources' => $tenant,
+        ]);
+    }
+
+    public function approve(int $id): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($id);
+        $this->tenantService->approveTenant($tenant);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Tenant {$tenant->name} has been approved.",
+            'resources' => $tenant->fresh(['subscription.plan', 'users']),
+        ]);
+    }
+
+    public function reject(int $id): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($id);
+        $this->tenantService->rejectTenant($tenant);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Tenant {$tenant->name} has been rejected.",
+            'resources' => $tenant->fresh(['subscription.plan', 'users']),
         ]);
     }
 

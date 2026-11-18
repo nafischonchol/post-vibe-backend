@@ -11,6 +11,12 @@ class VideoScraperService
 {
     protected int $timeout = 25;
 
+    public function __construct(
+        protected ?YtDlpService $ytDlp = null
+    ) {
+        $this->ytDlp = $ytDlp ?? app(YtDlpService::class);
+    }
+
     /**
      * Scrape video metadata and direct media stream from any supported social URL.
      *
@@ -32,6 +38,20 @@ class VideoScraperService
     public function scrape(string $url): array
     {
         $cleanUrl = trim($url);
+
+        // 1. If yt-dlp is available, try extracting high-fidelity metadata first
+        if ($this->ytDlp && $this->ytDlp->isAvailable()) {
+            try {
+                $ytMetadata = $this->ytDlp->extractMetadata($cleanUrl);
+                if ($ytMetadata !== null) {
+                    return $ytMetadata;
+                }
+            } catch (Exception $e) {
+                Log::debug("YtDlpService extraction fallback for {$cleanUrl}: " . $e->getMessage());
+            }
+        }
+
+        // 2. Fallback to platform-specific scrapers
         $platform = $this->detectPlatform($cleanUrl);
 
         try {

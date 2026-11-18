@@ -41,4 +41,10 @@ return [
         'site_name' => env('APP_NAME', 'Post Vibe'),
     ],
 
+    'yt_dlp' => [
+        'binary_path' => env('YT_DLP_PATH', base_path('bin/yt-dlp')),
+        'timeout' => (int) env('YT_DLP_TIMEOUT', 300),
+        'max_filesize' => env('YT_DLP_MAX_FILESIZE', '150M'),
+    ],
+
 ];

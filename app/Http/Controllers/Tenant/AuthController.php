@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\TenantLoginRequest;
+use App\Http\Requests\Tenant\TenantRegisterRequest;
 use App\Services\Tenant\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,11 @@ class AuthController extends Controller
     public function __construct(
         protected AuthService $authService
     ) {}
+
+    public function register(TenantRegisterRequest $request): JsonResponse
+    {
+        return $this->authService->register($request->validated());
+    }
 
     public function login(TenantLoginRequest $request): JsonResponse
     {
