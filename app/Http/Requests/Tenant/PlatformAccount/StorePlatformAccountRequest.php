@@ -12,6 +12,7 @@ class StorePlatformAccountRequest extends BaseFormRequest
             'platform' => ['required', 'in:youtube,tiktok,facebook'],
             'account_name' => ['required', 'string', 'max:255'],
             'account_handle' => ['nullable', 'string', 'max:255'],
+            'external_account_id' => ['nullable', 'string', 'max:255'],
             'avatar_url' => ['nullable', 'url'],
             'access_token' => ['required', 'string', 'min:10', 'not_regex:/^mock_/i'],
             'refresh_token' => ['nullable', 'string', 'min:10', 'not_regex:/^mock_/i'],

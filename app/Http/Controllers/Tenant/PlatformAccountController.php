@@ -23,6 +23,7 @@ class PlatformAccountController extends Controller
                 'token_expires_at' => $acc->token_expires_at,
                 'is_expiring' => $acc->isTokenExpiringSoon(),
                 'last_validated_at' => $acc->last_validated_at,
+                'external_account_id' => $acc->external_account_id,
             ];
         });
 
@@ -39,13 +40,16 @@ class PlatformAccountController extends Controller
                 'account_name' => $validated['account_name'],
             ],
             [
-                'account_handle' => $validated['account_handle'] ?? ('@' . strtolower(str_replace(' ', '', $validated['account_name']))),
+                'account_handle' => $validated['platform'] === 'facebook'
+                    ? null
+                    : ($validated['account_handle'] ?? ('@' . strtolower(str_replace(' ', '', $validated['account_name'])))),
                 'avatar_url' => $validated['avatar_url'] ?? null,
                 'encrypted_access_token' => $validated['access_token'],
                 'encrypted_refresh_token' => $validated['refresh_token'] ?? null,
                 'token_expires_at' => now()->addDays(60),
                 'status' => 'active',
                 'last_validated_at' => now(),
+                'external_account_id' => $validated['external_account_id'] ?? null,
             ]
         );
 
