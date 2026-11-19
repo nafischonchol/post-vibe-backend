@@ -69,11 +69,13 @@ class UploadToPlatformJob implements ShouldQueue
             // 3. Consume platform quota atomically
             $quotaService->settlePlatformUpload($this->schedule, true);
 
-            // 4. Check if all sibling platform schedules in the batch are terminal
+            // 4. Delete temporary media only after all platform schedules are published.
+            // Non-published outcomes are handled by scheduled retention cleanup.
             $batch = $this->schedule->batch->fresh('schedules');
-            $allTerminal = $batch->schedules->every(fn($s) => in_array($s->upload_status, ['published', 'failed', 'cancelled']));
+            $allPublished = $batch->schedules->isNotEmpty()
+                && $batch->schedules->every(fn($s) => $s->upload_status === 'published');
 
-            if ($allTerminal && $video->temporary_storage_path) {
+            if ($allPublished && $video->temporary_storage_path) {
                 // Delete temporary video according to Section 17 retention policy
                 $storage->deleteTemporaryMedia($video->temporary_storage_path);
                 $video->update(['temporary_storage_path' => null]);

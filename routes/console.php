@@ -23,4 +23,10 @@ Schedule::command('analytics:sync-platforms --limit=50')
     ->withoutOverlapping(30)
     ->runInBackground();
 
+// 4. Temporary Video Cleanup: Remove temporary media when fully published or expired (10-day retention)
+Schedule::command('videos:cleanup-temp --days=10 --limit=200')
+    ->hourly()
+    ->withoutOverlapping(30)
+    ->runInBackground();
+
 
