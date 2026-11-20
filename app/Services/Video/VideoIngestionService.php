@@ -134,12 +134,48 @@ class VideoIngestionService
     }
 
     /**
+     * Check if a URL targets a specific video/short/reel rather than a channel/profile page.
+     */
+    public function isDirectVideoUrl(?string $url): bool
+    {
+        if (empty($url) || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $parsed = parse_url($url);
+        $path = $parsed['path'] ?? '';
+        $query = $parsed['query'] ?? '';
+
+        // TikTok direct video (/video/123456...)
+        if (preg_match('#/video/\d+#', $path)) {
+            return true;
+        }
+
+        // YouTube direct video/short
+        if (str_contains($path, '/shorts/') || str_contains($path, '/watch') || str_contains($query, 'v=')) {
+            return true;
+        }
+
+        // Instagram direct post/reel
+        if (preg_match('#/(reel|p|tv)/[^/]+#', $path)) {
+            return true;
+        }
+
+        // Facebook direct video
+        if (str_contains($path, '/videos/') || str_contains($path, '/reel/') || str_contains($path, '/watch')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Fetch feed items for a given video source.
      */
     public function fetchSourceFeed(VideoSource $source): array
     {
         // 1. If source_url points to a specific video/short, scrape it directly
-        if (! empty($source->source_url) && filter_var($source->source_url, FILTER_VALIDATE_URL)) {
+        if (! empty($source->source_url) && $this->isDirectVideoUrl($source->source_url)) {
             try {
                 $scraped = $this->scraper->scrape($source->source_url);
                 return [
@@ -155,7 +191,7 @@ class VideoIngestionService
                     ]
                 ];
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning("Direct scraper failed on {$source->source_url}: " . $e->getMessage());
+                Log::warning("Direct scraper failed on {$source->source_url}: " . $e->getMessage());
             }
         }
 

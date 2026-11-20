@@ -128,9 +128,20 @@ class VideoScraperService
         if ($oembed->successful()) {
             $data = $oembed->json();
             $caption = $data['title'] ?? '';
+
+            // Extract real video ID if available from URL or oEmbed
+            $postId = null;
+            if (preg_match('#/video/(\d+)#', $url, $matches)) {
+                $postId = $matches[1];
+            } elseif (! empty($data['embed_product_id']) && ($data['embed_type'] ?? '') === 'video') {
+                $postId = (string) $data['embed_product_id'];
+            } else {
+                $postId = 'tt_' . substr(md5($url), 0, 12);
+            }
+
             return [
                 'platform' => 'tiktok',
-                'source_post_id' => 'tt_' . substr(md5($url), 0, 12),
+                'source_post_id' => $postId,
                 'source_post_url' => $url,
                 'title' => Str::limit($caption, 90, '...'),
                 'original_caption' => $caption,
