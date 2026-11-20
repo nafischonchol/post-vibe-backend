@@ -29,11 +29,17 @@ class PublishingSchedule extends Model
 
     protected $appends = [
         'platform_post_url',
+        'error_message',
     ];
 
     public function getPlatformPostUrlAttribute(): ?string
     {
         return $this->external_post_url;
+    }
+
+    public function getErrorMessageAttribute(): ?string
+    {
+        return $this->last_error;
     }
 
     protected function casts(): array

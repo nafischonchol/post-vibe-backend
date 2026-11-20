@@ -5,6 +5,8 @@ namespace App\Services\Video;
 use App\Jobs\Video\DownloadAndStoreVideoJob;
 use App\Models\Video;
 use App\Models\VideoSource;
+use Exception;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class VideoIngestionService
@@ -56,10 +58,25 @@ class VideoIngestionService
 
     /**
      * Ingest a discovered video record and dispatch download/processing.
+     * Skips videos published more than $maxAgeHours (default: 48) ago.
      */
-    public function ingestDiscoveredVideo(VideoSource $source, array $postData): ?Video
+    public function ingestDiscoveredVideo(VideoSource $source, array $postData, int $maxAgeHours = 48): ?Video
     {
-        // 1. Check for Duplicate by Source Post ID within Tenant
+        // 1. Skip if video is older than $maxAgeHours (48 hours)
+        $publishedAt = $postData['source_published_at'] ?? null;
+        if ($publishedAt) {
+            try {
+                $publishedTime = \Carbon\Carbon::parse($publishedAt);
+                if ($publishedTime->isBefore(now()->subHours($maxAgeHours))) {
+                    Log::info("Skipping video {$postData['source_post_id']} for source {$source->name}: published at {$publishedAt} which is older than {$maxAgeHours} hours.");
+                    return null;
+                }
+            } catch (Exception $e) {
+                Log::warning("Failed to parse published date '{$publishedAt}': " . $e->getMessage());
+            }
+        }
+
+        // 2. Check for Duplicate by Source Post ID within Tenant
         $existing = Video::withoutGlobalScopes()
             ->where('tenant_id', $source->tenant_id)
             ->where('source_id', $source->id)
@@ -70,11 +87,11 @@ class VideoIngestionService
             return $existing;
         }
 
-        // 2. Extract hashtags from caption if not provided
+        // 3. Extract hashtags from caption if not provided
         $caption = $postData['original_caption'] ?? '';
         $hashtags = $postData['original_hashtags'] ?? $this->scraper->extractHashtags($caption);
 
-        // 3. Create Video Record
+        // 4. Create Video Record
         $video = Video::create([
             'tenant_id' => $source->tenant_id,
             'source_id' => $source->id,
@@ -85,11 +102,11 @@ class VideoIngestionService
             'original_hashtags' => array_values($hashtags),
             'thumbnail_url' => $postData['thumbnail_url'] ?? null,
             'duration' => $postData['duration'] ?? null,
-            'source_published_at' => $postData['source_published_at'] ?? now(),
+            'source_published_at' => $publishedAt ?? now(),
             'processing_status' => 'discovered',
         ]);
 
-        // 4. Dispatch Download and S3 Processing Job
+        // 5. Dispatch Download and S3 Processing Job
         $mediaUrl = $postData['download_url'] ?? $postData['source_post_url'] ?? null;
         if ($mediaUrl) {
             DownloadAndStoreVideoJob::dispatch($video, $mediaUrl);
@@ -168,16 +185,21 @@ class VideoIngestionService
 
     /**
      * Scan a source immediately and ingest any discovered videos.
+     * Skips videos published more than $maxAgeHours (default: 48) ago.
      */
-    public function scanSource(VideoSource $source): array
+    public function scanSource(VideoSource $source, int $maxAgeHours = 48): array
     {
         $discoveredPosts = $this->fetchSourceFeed($source);
 
         $ingested = [];
+        $skippedCount = 0;
+
         foreach ($discoveredPosts as $post) {
-            $video = $this->ingestDiscoveredVideo($source, $post);
+            $video = $this->ingestDiscoveredVideo($source, $post, $maxAgeHours);
             if ($video && $video->wasRecentlyCreated) {
                 $ingested[] = $video;
+            } elseif ($video === null) {
+                $skippedCount++;
             }
         }
 
@@ -186,6 +208,9 @@ class VideoIngestionService
             'last_error' => null,
         ]);
 
-        return $ingested;
+        return [
+            'ingested' => $ingested,
+            'skipped_count' => $skippedCount,
+        ];
     }
 }

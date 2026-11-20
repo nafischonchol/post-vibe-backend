@@ -130,4 +130,57 @@ class VideoScraperAndIngestionTest extends TestCase
             'source_id' => $source->id,
         ]);
     }
+
+    public function test_videos_older_than_48_hours_are_skipped_during_scraping(): void
+    {
+        $source = VideoSource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Archive Channel',
+            'platform' => 'tiktok',
+            'source_identifier' => '@oldchannel',
+            'source_url' => 'https://www.tiktok.com/@oldchannel',
+            'scan_frequency' => 60,
+            'status' => 'active',
+        ]);
+
+        $ingestionService = app(\App\Services\Video\VideoIngestionService::class);
+
+        // 1. Post published 72 hours ago (older than 48h) -> Should be skipped
+        $oldPost = [
+            'source_post_id' => 'post_old_123',
+            'source_post_url' => 'https://tiktok.com/@oldchannel/video/123',
+            'original_caption' => 'Old video from 3 days ago #retro',
+            'original_hashtags' => ['retro'],
+            'thumbnail_url' => null,
+            'duration' => 20,
+            'source_published_at' => now()->subHours(72)->toDateTimeString(),
+            'download_url' => null,
+        ];
+
+        $oldResult = $ingestionService->ingestDiscoveredVideo($source, $oldPost);
+        $this->assertNull($oldResult);
+        $this->assertDatabaseMissing('videos', [
+            'tenant_id' => $this->tenant->id,
+            'source_post_id' => 'post_old_123',
+        ]);
+
+        // 2. Post published 5 hours ago (fresh, under 48h) -> Should be ingested
+        $freshPost = [
+            'source_post_id' => 'post_fresh_456',
+            'source_post_url' => 'https://tiktok.com/@oldchannel/video/456',
+            'original_caption' => 'Fresh video from today #fresh',
+            'original_hashtags' => ['fresh'],
+            'thumbnail_url' => null,
+            'duration' => 25,
+            'source_published_at' => now()->subHours(5)->toDateTimeString(),
+            'download_url' => null,
+        ];
+
+        $freshResult = $ingestionService->ingestDiscoveredVideo($source, $freshPost);
+        $this->assertNotNull($freshResult);
+        $this->assertDatabaseHas('videos', [
+            'tenant_id' => $this->tenant->id,
+            'source_post_id' => 'post_fresh_456',
+        ]);
+    }
 }

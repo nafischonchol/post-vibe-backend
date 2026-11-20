@@ -41,11 +41,13 @@ class ScanVideoSourcesCommand extends Command
             try {
                 $this->info("Scanning [{$source->platform}] {$source->name} ({$source->source_identifier})...");
 
-                // Scan source feed and ingest discovered posts
-                $newVideos = $ingestionService->scanSource($source);
+                // Scan source feed and ingest discovered posts (skips posts older than 48 hours)
+                $result = $ingestionService->scanSource($source);
+                $newVideos = is_array($result) && isset($result['ingested']) ? $result['ingested'] : $result;
                 $ingestedCount = count($newVideos);
+                $skippedCount = is_array($result) && isset($result['skipped_count']) ? $result['skipped_count'] : 0;
 
-                $this->info("Ingested {$ingestedCount} new video(s) for {$source->name}.");
+                $this->info("Ingested {$ingestedCount} new video(s) for {$source->name} (Skipped {$skippedCount} older than 48h).");
 
             } catch (Exception $e) {
                 Log::error("Failed to scan source ID {$source->id}: " . $e->getMessage());
