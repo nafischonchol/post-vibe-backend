@@ -9,3 +9,4 @@ Route::get('/', function () {
 
 // Public Social Media OAuth Callback Route
 Route::get('oauth/{platform}/callback', [OAuthController::class, 'callback'])->name('oauth.callback');
+Route::get('api/auth/callback/{platform}', [OAuthController::class, 'callback']);

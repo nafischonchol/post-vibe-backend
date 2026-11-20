@@ -12,13 +12,31 @@ use Illuminate\Support\Facades\Log;
 
 class DispatchOutboxCommand extends Command
 {
-    protected $signature = 'outbox:dispatch {--limit=100}';
+    protected $signature = 'outbox:dispatch {--limit=100} {--watch} {--interval=3}';
     protected $description = 'Poll pending transactional outbox events and dispatch queue jobs reliably';
 
     public function handle(): int
     {
         $limit = (int) $this->option('limit');
+        $watch = (bool) $this->option('watch');
+        $interval = max(1, (int) $this->option('interval'));
 
+        if ($watch) {
+            $this->info("Outbox worker listening for pending events every {$interval}s...");
+        }
+
+        do {
+            $this->dispatchCycle($limit);
+            if ($watch) {
+                sleep($interval);
+            }
+        } while ($watch);
+
+        return Command::SUCCESS;
+    }
+
+    protected function dispatchCycle(int $limit): void
+    {
         $events = DB::transaction(function () use ($limit) {
             return TransactionalOutbox::where('status', 'pending')
                 ->where('available_at', '<=', now())
@@ -29,7 +47,7 @@ class DispatchOutboxCommand extends Command
         });
 
         if ($events->isEmpty()) {
-            return Command::SUCCESS;
+            return;
         }
 
         $this->info("Processing {$events->count()} outbox events...");
@@ -45,7 +63,7 @@ class DispatchOutboxCommand extends Command
 
                         foreach ($batch->schedules as $schedule) {
                             if (in_array($schedule->upload_status, ['pending', 'scheduled', 'queued'])) {
-                                UploadToPlatformJob::dispatch($schedule);
+                                UploadToPlatformJob::dispatch($schedule)->onQueue('publishing');
                             }
                         }
                     }
@@ -68,6 +86,5 @@ class DispatchOutboxCommand extends Command
         }
 
         $this->info('Outbox dispatch cycle completed.');
-        return Command::SUCCESS;
     }
 }

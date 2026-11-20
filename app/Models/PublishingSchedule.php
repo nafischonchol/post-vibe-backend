@@ -27,6 +27,15 @@ class PublishingSchedule extends Model
         'published_at',
     ];
 
+    protected $appends = [
+        'platform_post_url',
+    ];
+
+    public function getPlatformPostUrlAttribute(): ?string
+    {
+        return $this->external_post_url;
+    }
+
     protected function casts(): array
     {
         return [

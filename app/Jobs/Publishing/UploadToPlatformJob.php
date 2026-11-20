@@ -22,7 +22,9 @@ class UploadToPlatformJob implements ShouldQueue
 
     public function __construct(
         public PublishingSchedule $schedule
-    ) {}
+    ) {
+        $this->onQueue('publishing');
+    }
 
     public function handle(
         PublishingQuotaService $quotaService,

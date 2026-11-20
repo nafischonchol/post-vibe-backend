@@ -28,6 +28,15 @@ class PublishingBatch extends Model
         'published_at',
     ];
 
+    protected $appends = [
+        'trigger_type',
+    ];
+
+    public function getTriggerTypeAttribute(): string
+    {
+        return $this->publishing_mode ?: 'manual';
+    }
+
     protected function casts(): array
     {
         return [

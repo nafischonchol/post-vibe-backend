@@ -220,6 +220,16 @@ return [
             'timeout' => 90,
             'nice' => 0,
         ],
+        'supervisor-publishing' => [
+            'connection' => 'redis',
+            'queue' => ['publishing'],
+            'balance' => 'simple',
+            'maxProcesses' => 3,
+            'memory' => 512,
+            'tries' => 3,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -232,6 +242,9 @@ return [
             'supervisor-chat' => [
                 'maxProcesses' => 5,
             ],
+            'supervisor-publishing' => [
+                'maxProcesses' => 5,
+            ],
         ],
 
         'local' => [
@@ -240,6 +253,9 @@ return [
             ],
             'supervisor-chat' => [
                 'maxProcesses' => 2,
+            ],
+            'supervisor-publishing' => [
+                'maxProcesses' => 3,
             ],
         ],
     ],

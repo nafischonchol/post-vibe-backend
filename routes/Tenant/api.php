@@ -27,6 +27,7 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     Route::get('videos', [VideoController::class, 'index'])->name('videos.index');
     Route::get('videos/{id}', [VideoController::class, 'show'])->name('videos.show');
     Route::post('videos/{id}/reprocess', [VideoController::class, 'reprocess'])->name('videos.reprocess');
+    Route::delete('videos/{id}', [VideoController::class, 'destroy'])->name('videos.destroy');
 
     // 5. AI Metadata Management
     Route::get('videos/{id}/metadata', [MetadataController::class, 'show'])->name('metadata.show');

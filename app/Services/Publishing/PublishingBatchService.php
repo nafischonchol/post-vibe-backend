@@ -37,7 +37,7 @@ class PublishingBatchService
         $scheduledTime = $scheduledAt ?: now();
         $idempotencyKey = hash('sha256', "{$tenant->id}:{$video->id}:" . json_encode($targets) . ":{$scheduledTime->timestamp}");
 
-        return DB::transaction(function () use (
+        $batch = DB::transaction(function () use (
             $tenant,
             $video,
             $targets,
@@ -133,6 +133,16 @@ class PublishingBatchService
 
             return $batch->load(['schedules.platformAccount', 'schedules.metadata']);
         });
+
+        if (! $scheduledTime->isFuture()) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('outbox:dispatch', ['--limit' => 20]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Immediate outbox dispatch warning: ' . $e->getMessage());
+            }
+        }
+
+        return $batch;
     }
 
     /**
