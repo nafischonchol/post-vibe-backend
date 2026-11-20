@@ -100,5 +100,21 @@ class MultiTenantIsolationTest extends TestCase
             ->getJson("/api/v1/tenant/videos/{$videoA->id}");
 
         $responseDirect->assertStatus(404);
+
+        // 6. Tenant B attempts to delete Tenant A's video -> Expect 404
+        $responseDeleteForbidden = $this->withHeader('Authorization', "Bearer {$tokenB}")
+            ->deleteJson("/api/v1/tenant/videos/{$videoA->id}");
+
+        $responseDeleteForbidden->assertStatus(404);
+        $this->assertDatabaseHas('videos', ['id' => $videoA->id]);
+
+        // 7. Tenant A deletes their own video -> Expect 200 and removed from DB
+        auth()->forgetGuards();
+        TenantContext::clear();
+        $responseDelete = $this->withHeader('Authorization', "Bearer {$tokenA}")
+            ->deleteJson("/api/v1/tenant/videos/{$videoA->id}");
+
+        $responseDelete->assertStatus(200);
+        $this->assertDatabaseMissing('videos', ['id' => $videoA->id]);
     }
 }

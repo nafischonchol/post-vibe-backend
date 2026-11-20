@@ -39,6 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->api(prepend: [
+            \App\Http\Middleware\ConvertQueryTokenToBearer::class,
+        ]);
         $middleware->api(append: [
             ThrottleRequests::class.':api',
         ]);

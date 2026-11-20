@@ -19,7 +19,7 @@ jobs:
           port: 22
           script: |
             set -e
-            cd /home/nafis/apps/api.mohima.skin  
+            cd /apps/api.postvibe.mohima.skin  
 
             git reset --hard HEAD
 

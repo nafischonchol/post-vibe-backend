@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Video\DownloadAndStoreVideoJob;
 use App\Models\Video;
+use App\Services\Storage\MediaStorageService;
 use App\Services\Video\VideoIngestionService;
+use App\Services\Video\VideoScraperService;
+use App\Services\Video\YtDlpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class VideoController extends Controller
 {
@@ -55,6 +60,88 @@ class VideoController extends Controller
         ]);
     }
 
+    /**
+     * Stream or download the video media file.
+     */
+    public function stream(Request $request, int $id, MediaStorageService $storage)
+    {
+        $video = Video::findOrFail($id);
+
+        if (! $video->temporary_storage_path) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Video media file has not been downloaded yet.',
+            ], 404);
+        }
+
+        $disk = $storage->getDiskForPath($video->temporary_storage_path);
+
+        if ($disk === 'r2' || $disk === 's3') {
+            try {
+                $url = $storage->getUrl($video->temporary_storage_path);
+                return redirect()->away($url);
+            } catch (\Exception $e) {
+                // fall through to local stream if redirect is not possible
+            }
+        }
+
+        if (Storage::disk($disk)->exists($video->temporary_storage_path)) {
+            $disposition = $request->query('download') ? 'attachment' : 'inline';
+            return Storage::disk($disk)->response(
+                $video->temporary_storage_path,
+                "{$video->video_uid}.mp4",
+                [
+                    'Content-Type' => 'video/mp4',
+                    'Accept-Ranges' => 'bytes',
+                ],
+                $disposition
+            );
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Media file not found in storage.',
+        ], 404);
+    }
+
+    /**
+     * Download and process the video media file immediately.
+     */
+    public function downloadNow(
+        Request $request,
+        int $id,
+        MediaStorageService $storage,
+        VideoScraperService $scraper,
+        YtDlpService $ytDlp
+    ): JsonResponse {
+        $video = Video::findOrFail($id);
+        $url = $request->input('media_url') ?: $video->source_post_url;
+
+        if (! $url) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No media URL or source URL available for this video.',
+            ], 422);
+        }
+
+        try {
+            $job = new DownloadAndStoreVideoJob($video, $url);
+            $job->handle($storage, $scraper, $ytDlp);
+            $video->refresh();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Video downloaded successfully and is ready to play.',
+                'resources' => $video,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to download video: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
     public function reprocess(Request $request, int $id): JsonResponse
     {
         $video = Video::findOrFail($id);
@@ -64,6 +151,22 @@ class VideoController extends Controller
             'status' => 'success',
             'message' => 'Video re-queued for processing.',
             'resources' => $video,
+        ]);
+    }
+
+    public function destroy(int $id, MediaStorageService $storage): JsonResponse
+    {
+        $video = Video::findOrFail($id);
+
+        if ($video->temporary_storage_path) {
+            $storage->deleteTemporaryMedia($video->temporary_storage_path);
+        }
+
+        $video->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Video deleted successfully.',
         ]);
     }
 }

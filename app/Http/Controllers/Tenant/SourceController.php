@@ -32,6 +32,9 @@ class SourceController extends Controller
         $source = VideoSource::findOrFail($id);
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
+            'platform' => ['nullable', 'string', 'in:instagram,facebook,youtube,tiktok,generic'],
+            'source_identifier' => ['nullable', 'string'],
+            'source_url' => ['nullable', 'url'],
             'status' => ['nullable', 'string', 'in:active,paused'],
             'scan_frequency' => ['nullable', 'integer', 'min:15', 'max:1440'],
         ]);
@@ -80,6 +83,37 @@ class SourceController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to scrape video: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Instantly scan and scrape videos from a specific video source feed.
+     */
+    public function scan(int $id, VideoIngestionService $ingestionService): JsonResponse
+    {
+        $source = VideoSource::findOrFail($id);
+
+        try {
+            $newVideos = $ingestionService->scanSource($source);
+            $count = count($newVideos);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $count > 0
+                    ? "Successfully scraped {$count} new video(s) from {$source->name}."
+                    : "Instant scan completed for {$source->name}. No new videos found.",
+                'resources' => [
+                    'source' => $source->fresh()->loadCount('videos'),
+                    'new_count' => $count,
+                ],
+            ]);
+        } catch (Exception $e) {
+            $source->update(['last_error' => $e->getMessage()]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to scrape video source: ' . $e->getMessage(),
             ], 422);
         }
     }

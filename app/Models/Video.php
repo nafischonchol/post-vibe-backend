@@ -33,6 +33,12 @@ class Video extends Model
         'processing_error',
     ];
 
+    protected $appends = [
+        'is_downloaded',
+        'playback_url',
+        'file_size_formatted',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -41,6 +47,34 @@ class Video extends Model
             'file_size_bytes' => 'integer',
             'source_published_at' => 'datetime',
         ];
+    }
+
+    public function getIsDownloadedAttribute(): bool
+    {
+        return ! empty($this->temporary_storage_path) || in_array($this->processing_status, ['downloaded', 'stored', 'ready', 'published']);
+    }
+
+    public function getPlaybackUrlAttribute(): ?string
+    {
+        if (empty($this->temporary_storage_path)) {
+            return null;
+        }
+
+        return url("/api/v1/tenant/videos/{$this->id}/stream");
+    }
+
+    public function getFileSizeFormattedAttribute(): ?string
+    {
+        if (! $this->file_size_bytes) {
+            return null;
+        }
+
+        $bytes = $this->file_size_bytes;
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $power = $bytes > 0 ? (int) floor(log($bytes, 1024)) : 0;
+        $power = min($power, count($units) - 1);
+
+        return number_format($bytes / pow(1024, $power), 1) . ' ' . $units[$power];
     }
 
     protected static function booted(): void

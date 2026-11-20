@@ -21,11 +21,14 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
 
     // 3. Video Sources
     Route::post('sources/scrape-video', [SourceController::class, 'scrapeAndIngest'])->name('sources.scrape');
+    Route::post('sources/{id}/scan', [SourceController::class, 'scan'])->name('sources.scan');
     Route::apiResource('sources', SourceController::class);
 
     // 4. Video Management
     Route::get('videos', [VideoController::class, 'index'])->name('videos.index');
     Route::get('videos/{id}', [VideoController::class, 'show'])->name('videos.show');
+    Route::get('videos/{id}/stream', [VideoController::class, 'stream'])->name('videos.stream');
+    Route::post('videos/{id}/download-now', [VideoController::class, 'downloadNow'])->name('videos.downloadNow');
     Route::post('videos/{id}/reprocess', [VideoController::class, 'reprocess'])->name('videos.reprocess');
     Route::delete('videos/{id}', [VideoController::class, 'destroy'])->name('videos.destroy');
 

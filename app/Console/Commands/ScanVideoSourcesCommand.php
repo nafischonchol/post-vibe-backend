@@ -41,21 +41,9 @@ class ScanVideoSourcesCommand extends Command
             try {
                 $this->info("Scanning [{$source->platform}] {$source->name} ({$source->source_identifier})...");
 
-                // Collect new videos from source platform via VideoScraperService
-                $discoveredPosts = $this->fetchSourceFeed($source, $scraper);
-
-                $ingestedCount = 0;
-                foreach ($discoveredPosts as $post) {
-                    $video = $ingestionService->ingestDiscoveredVideo($source, $post);
-                    if ($video && $video->wasRecentlyCreated) {
-                        $ingestedCount++;
-                    }
-                }
-
-                $source->update([
-                    'last_scanned_at' => now(),
-                    'last_error' => null,
-                ]);
+                // Scan source feed and ingest discovered posts
+                $newVideos = $ingestionService->scanSource($source);
+                $ingestedCount = count($newVideos);
 
                 $this->info("Ingested {$ingestedCount} new video(s) for {$source->name}.");
 

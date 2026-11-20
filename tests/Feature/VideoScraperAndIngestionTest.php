@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\Video;
+use App\Models\VideoSource;
 use App\Services\Video\VideoScraperService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -100,5 +101,33 @@ class VideoScraperAndIngestionTest extends TestCase
             ->count();
 
         $this->assertEquals(1, $count);
+    }
+
+    public function test_tenant_can_trigger_instant_source_scrape(): void
+    {
+        $source = VideoSource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Tech Shorts Channel',
+            'platform' => 'youtube',
+            'source_identifier' => '@techshorts',
+            'source_url' => 'https://www.youtube.com/@techshorts',
+            'scan_frequency' => 60,
+            'status' => 'active',
+        ]);
+
+        $response = $this->withHeader('Authorization', "Bearer {$this->token}")
+            ->postJson("/api/v1/tenant/sources/{$source->id}/scan");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+            ]);
+
+        $source->refresh();
+        $this->assertNotNull($source->last_scanned_at);
+        $this->assertDatabaseHas('videos', [
+            'tenant_id' => $this->tenant->id,
+            'source_id' => $source->id,
+        ]);
     }
 }

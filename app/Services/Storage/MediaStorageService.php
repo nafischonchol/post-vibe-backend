@@ -8,11 +8,35 @@ use Illuminate\Support\Str;
 class MediaStorageService
 {
     /**
-     * Determine active disk: S3 if configured, otherwise local storage.
+     * Determine active disk: R2 if configured, S3 if configured, otherwise public local storage.
      */
     public function getDisk(): string
     {
+        if (config('filesystems.disks.r2.key')) {
+            return 'r2';
+        }
+
         return config('filesystems.disks.s3.key') ? 's3' : 'public';
+    }
+
+    /**
+     * Determine disk where a specific path exists.
+     */
+    public function getDiskForPath(?string $path = null): string
+    {
+        if ($path) {
+            if (Storage::disk('public')->exists($path)) {
+                return 'public';
+            }
+            if (config('filesystems.disks.r2.key') && Storage::disk('r2')->exists($path)) {
+                return 'r2';
+            }
+            if (config('filesystems.disks.s3.key') && Storage::disk('s3')->exists($path)) {
+                return 's3';
+            }
+        }
+
+        return $this->getDisk();
     }
 
     /**
@@ -30,11 +54,18 @@ class MediaStorageService
     }
 
     /**
-     * Get accessible URL (signed URL for S3, public asset URL for local).
+     * Get accessible URL (signed URL for S3/R2, public asset URL for local).
      */
     public function getUrl(string $path, int $expirationMinutes = 60): string
     {
-        $disk = $this->getDisk();
+        $disk = $this->getDiskForPath($path);
+
+        if ($disk === 'r2') {
+            if (config('filesystems.disks.r2.url')) {
+                return rtrim(config('filesystems.disks.r2.url'), '/') . '/' . ltrim($path, '/');
+            }
+            return Storage::disk('r2')->temporaryUrl($path, now()->addMinutes($expirationMinutes));
+        }
 
         if ($disk === 's3') {
             return Storage::disk('s3')->temporaryUrl($path, now()->addMinutes($expirationMinutes));
@@ -52,7 +83,7 @@ class MediaStorageService
             return null;
         }
 
-        $disk = $this->getDisk();
+        $disk = $this->getDiskForPath($path);
         if (Storage::disk($disk)->exists($path)) {
             return Storage::disk($disk)->get($path);
         }
@@ -69,7 +100,7 @@ class MediaStorageService
             return false;
         }
 
-        $disk = $this->getDisk();
+        $disk = $this->getDiskForPath($path);
         if (Storage::disk($disk)->exists($path)) {
             return Storage::disk($disk)->delete($path);
         }
