@@ -17,7 +17,7 @@ class AdminSeeder extends Seeder
         ], [
             'name' => 'Super Admin',
             'password' => 'admin@gmail.com',
-            'phone' => '1234567890',
+            'phone' => '01641377742',
             'is_active' => true,
         ]);
     }
