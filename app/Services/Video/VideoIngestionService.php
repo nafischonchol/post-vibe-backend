@@ -12,15 +12,34 @@ use Illuminate\Support\Str;
 class VideoIngestionService
 {
     public function __construct(
-        protected VideoScraperService $scraper
-    ) {}
+        protected VideoScraperService $scraper,
+        protected ?YtDlpService $ytDlp = null
+    ) {
+        $this->ytDlp = $ytDlp ?? app(YtDlpService::class);
+    }
 
     /**
      * Ingest and scrape a video from a direct URL.
      */
     public function ingestFromUrl(int $tenantId, string $url, ?int $sourceId = null): Video
     {
-        $scraped = $this->scraper->scrape($url);
+        $targetUrl = $url;
+
+        // If a channel or profile URL was provided, attempt to resolve the most recent video post
+        if (! $this->isDirectVideoUrl($url) && $this->ytDlp && $this->ytDlp->isAvailable()) {
+            $feed = $this->ytDlp->extractFeed($url, 1);
+            if (! empty($feed[0]['source_post_url'])) {
+                $targetUrl = $feed[0]['source_post_url'];
+            }
+        }
+
+        $scraped = $this->scraper->scrape($targetUrl);
+
+        // Reject if duration is less than 5 seconds
+        $duration = isset($scraped['duration']) && $scraped['duration'] !== null ? (int) $scraped['duration'] : null;
+        if ($duration === null || $duration < 5) {
+            throw new Exception("Video length is " . ($duration !== null ? "{$duration}s" : "0s") . ", which is less than the required minimum of 5 seconds.");
+        }
 
         // 1. Check duplicate within tenant
         $existing = Video::withoutGlobalScopes()
@@ -58,13 +77,20 @@ class VideoIngestionService
 
     /**
      * Ingest a discovered video record and dispatch download/processing.
-     * Skips videos published more than $maxAgeHours (default: 48) ago.
+     * Skips videos published more than $maxAgeHours (default: 168 / 7 days) ago.
      */
-    public function ingestDiscoveredVideo(VideoSource $source, array $postData, int $maxAgeHours = 48): ?Video
+    public function ingestDiscoveredVideo(VideoSource $source, array $postData, int $maxAgeHours = 168): ?Video
     {
-        // 1. Skip if video is older than $maxAgeHours (48 hours)
+        // 1. Skip if video duration is unknown or less than 5 seconds
+        $duration = isset($postData['duration']) && $postData['duration'] !== null ? (int) $postData['duration'] : null;
+        if ($duration === null || $duration < 5) {
+            Log::info("Skipping post {$postData['source_post_id']} for source {$source->name}: duration is " . ($duration !== null ? "{$duration}s" : 'unknown/0s') . " (minimum 5s required).");
+            return null;
+        }
+
+        // 2. Skip if video is older than $maxAgeHours (168 hours)
         $publishedAt = $postData['source_published_at'] ?? null;
-        if ($publishedAt) {
+        if ($publishedAt && $maxAgeHours > 0) {
             try {
                 $publishedTime = \Carbon\Carbon::parse($publishedAt);
                 if ($publishedTime->isBefore(now()->subHours($maxAgeHours))) {
@@ -195,35 +221,40 @@ class VideoIngestionService
             }
         }
 
-        // 2. Simulated/compliant feed generation for channel/profile identifiers
-        $sampleCaptions = [
-            "Quick productivity tip that will save you 10 hours this week! #shorts #productivity #lifehacks",
-            "This hidden browser feature is actually insane. Here's how to turn it on. #tech #tips #software",
-            "Why most creators fail at vertical video in 2026. Avoid this 1 mistake. #contentcreation #reels #growth",
-        ];
+        // 2. Resolve target profile/channel URL for feed extraction
+        $targetUrl = $source->source_url;
+        if (empty($targetUrl) && ! empty($source->source_identifier)) {
+            $identifier = ltrim($source->source_identifier, '@');
+            $targetUrl = match ($source->platform) {
+                'tiktok' => "https://www.tiktok.com/@{$identifier}",
+                'youtube' => "https://www.youtube.com/@{$identifier}",
+                'instagram' => "https://www.instagram.com/{$identifier}",
+                'facebook' => "https://www.facebook.com/{$identifier}",
+                default => null,
+            };
+        }
 
-        $postId = 'post_' . substr(md5($source->source_identifier . '_' . date('Y-m-d_H')), 0, 10);
-        $caption = $sampleCaptions[crc32($postId) % count($sampleCaptions)];
+        // 3. Extract real video posts from channel/profile feed via yt-dlp
+        if (! empty($targetUrl) && $this->ytDlp && $this->ytDlp->isAvailable()) {
+            try {
+                $feed = $this->ytDlp->extractFeed($targetUrl, 5);
+                if (! empty($feed)) {
+                    return $feed;
+                }
+            } catch (\Exception $e) {
+                Log::warning("yt-dlp extractFeed failed for source [{$source->name}] {$targetUrl}: " . $e->getMessage());
+            }
+        }
 
-        return [
-            [
-                'source_post_id' => $postId,
-                'source_post_url' => "https://{$source->platform}.com/watch/{$postId}",
-                'original_caption' => $caption,
-                'original_hashtags' => $this->scraper->extractHashtags($caption),
-                'thumbnail_url' => 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600',
-                'duration' => 38,
-                'source_published_at' => now()->subHours(1),
-                'download_url' => null,
-            ]
-        ];
+        Log::info("No videos found or feed extraction unavailable for source ID {$source->id} ({$source->name}).");
+        return [];
     }
 
     /**
      * Scan a source immediately and ingest any discovered videos.
-     * Skips videos published more than $maxAgeHours (default: 48) ago.
+     * Skips videos published more than $maxAgeHours (default: 168 / 7 days) ago.
      */
-    public function scanSource(VideoSource $source, int $maxAgeHours = 48): array
+    public function scanSource(VideoSource $source, int $maxAgeHours = 168): array
     {
         $discoveredPosts = $this->fetchSourceFeed($source);
 

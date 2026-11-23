@@ -14,6 +14,14 @@ class YtDlpService
     protected ?bool $isAvailableCache = null;
 
     /**
+     * Standard desktop browser User-Agent to prevent anti-bot challenges on TikTok and other platforms.
+     */
+    public function getUserAgent(): string
+    {
+        return config('services.yt_dlp.user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+    }
+
+    /**
      * Resolve the yt-dlp binary path.
      */
     public function getBinaryPath(): ?string
@@ -126,6 +134,7 @@ class YtDlpService
 
         $command = [
             $binary,
+            '--user-agent', $this->getUserAgent(),
             '--dump-single-json',
             '--no-warnings',
             '--no-playlist',
@@ -224,6 +233,7 @@ class YtDlpService
         // Format selection: prioritize mp4 container, fallback to best standard
         $command = [
             $binary,
+            '--user-agent', $this->getUserAgent(),
             '--no-playlist',
             '--no-warnings',
             '-f', 'best[ext=mp4]/best',
@@ -251,6 +261,149 @@ class YtDlpService
         }
 
         return $outputPath;
+    }
+
+    /**
+     * Extract feed / playlist items from a creator channel or profile URL.
+     *
+     * @param string $url Channel or profile URL.
+     * @param int $limit Maximum number of posts to fetch (default: 5).
+     * @return array<int, array{
+     *     source_post_id: string,
+     *     source_post_url: string,
+     *     title: ?string,
+     *     original_caption: string,
+     *     original_hashtags: array<string>,
+     *     thumbnail_url: ?string,
+     *     download_url: ?string,
+     *     duration: ?int,
+     *     author: ?string,
+     *     source_published_at: string
+     * }>
+     */
+    public function extractFeed(string $url, int $limit = 5): array
+    {
+        $binary = $this->getBinaryPath();
+        if (! $binary) {
+            return [];
+        }
+
+        $command = [
+            $binary,
+            '--user-agent', $this->getUserAgent(),
+            '--flat-playlist',
+            '--playlist-end', (string) $limit,
+            '--no-warnings',
+            '-J',
+            $url,
+        ];
+
+        try {
+            $timeout = (int) config('services.yt_dlp.feed_timeout', 60);
+            $process = new Process($command);
+            $process->setTimeout($timeout);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                Log::warning("yt-dlp extractFeed failed for {$url}: " . $process->getErrorOutput());
+                return [];
+            }
+
+            $rawJson = trim($process->getOutput());
+            $data = json_decode($rawJson, true);
+
+            if (! is_array($data)) {
+                return [];
+            }
+
+            $entries = $data['entries'] ?? [];
+            if (empty($entries) && ! empty($data['id']) && ($data['_type'] ?? '') !== 'playlist') {
+                $entries = [$data];
+            }
+
+            $results = [];
+            foreach ($entries as $entry) {
+                if (empty($entry) || ! is_array($entry)) {
+                    continue;
+                }
+
+                $postId = (string) ($entry['id'] ?? '');
+                if (empty($postId)) {
+                    continue;
+                }
+
+                // Determine video post URL
+                $postUrl = $entry['url'] ?? null;
+                if (empty($postUrl) || ! filter_var($postUrl, FILTER_VALIDATE_URL)) {
+                    $platform = $this->normalizeExtractor($entry['extractor_key'] ?? $entry['extractor'] ?? $data['extractor_key'] ?? $data['extractor'] ?? '', $url);
+                    if ($platform === 'tiktok') {
+                        $uploader = $entry['uploader'] ?? $data['uploader'] ?? $entry['channel'] ?? '';
+                        $postUrl = ! empty($uploader)
+                            ? "https://www.tiktok.com/@" . ltrim($uploader, '@') . "/video/{$postId}"
+                            : "https://www.tiktok.com/video/{$postId}";
+                    } elseif ($platform === 'youtube') {
+                        $postUrl = "https://www.youtube.com/watch?v={$postId}";
+                    } else {
+                        $postUrl = $entry['webpage_url'] ?? $url;
+                    }
+                }
+
+                $caption = $entry['description'] ?? $entry['title'] ?? '';
+                $title = ! empty($entry['title']) ? Str::limit($entry['title'], 90, '...') : null;
+
+                $hashtags = [];
+                if (! empty($entry['tags']) && is_array($entry['tags'])) {
+                    $hashtags = array_values(array_map('strval', $entry['tags']));
+                } else {
+                    preg_match_all('/#(\w+)/u', $caption, $tagMatches);
+                    $hashtags = array_values(array_unique($tagMatches[1] ?? []));
+                }
+
+                // Best thumbnail
+                $thumbnailUrl = null;
+                if (! empty($entry['thumbnails']) && is_array($entry['thumbnails'])) {
+                    $lastThumb = end($entry['thumbnails']);
+                    $thumbnailUrl = is_array($lastThumb) ? ($lastThumb['url'] ?? null) : null;
+                } elseif (! empty($entry['thumbnail'])) {
+                    $thumbnailUrl = $entry['thumbnail'];
+                }
+
+                // Published timestamp
+                $publishedAt = now()->toDateTimeString();
+                if (! empty($entry['timestamp'])) {
+                    $publishedAt = date('Y-m-d H:i:s', (int) $entry['timestamp']);
+                } elseif (! empty($entry['upload_date']) && strlen($entry['upload_date']) === 8) {
+                    $publishedAt = substr($entry['upload_date'], 0, 4) . '-' .
+                        substr($entry['upload_date'], 4, 2) . '-' .
+                        substr($entry['upload_date'], 6, 2) . ' 00:00:00';
+                }
+
+                $duration = isset($entry['duration']) && $entry['duration'] !== null ? (int) $entry['duration'] : null;
+
+                // Skip non-video posts (e.g. TikTok photo mode) and videos shorter than 5 seconds
+                if ($duration === null || $duration < 5) {
+                    continue;
+                }
+
+                $results[] = [
+                    'source_post_id' => $postId,
+                    'source_post_url' => $postUrl,
+                    'title' => $title,
+                    'original_caption' => $caption,
+                    'original_hashtags' => $hashtags,
+                    'thumbnail_url' => $thumbnailUrl,
+                    'download_url' => null, // Resolved in downloadVideo()
+                    'duration' => $duration,
+                    'author' => $entry['uploader'] ?? $entry['channel'] ?? $data['uploader'] ?? null,
+                    'source_published_at' => $publishedAt,
+                ];
+            }
+
+            return $results;
+        } catch (Exception $e) {
+            Log::error("yt-dlp extractFeed exception for {$url}: " . $e->getMessage());
+            return [];
+        }
     }
 
     /**

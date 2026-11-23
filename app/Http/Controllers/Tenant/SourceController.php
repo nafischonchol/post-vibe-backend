@@ -95,16 +95,20 @@ class SourceController extends Controller
         $source = VideoSource::findOrFail($id);
 
         try {
-            $result = $ingestionService->scanSource($source);
+            $result = $ingestionService->scanSource($source, 168);
             $newVideos = is_array($result) && isset($result['ingested']) ? $result['ingested'] : $result;
             $count = count($newVideos);
             $skipped = is_array($result) && isset($result['skipped_count']) ? $result['skipped_count'] : 0;
 
+            $totalCount = $source->fresh()->videos()->count();
+
             $message = $count > 0
                 ? "Successfully scraped {$count} new video(s) from {$source->name}."
-                : ($skipped > 0
-                    ? "Scan completed for {$source->name}. {$skipped} video(s) older than 48 hours were skipped."
-                    : "Instant scan completed for {$source->name}. No new videos found.");
+                : ($totalCount > 0
+                    ? "Scan completed for {$source->name}. All latest videos are already up to date ({$totalCount} video(s) found in your library)."
+                    : ($skipped > 0
+                        ? "Scan completed for {$source->name}. {$skipped} video(s) older than 7 days were skipped."
+                        : "Instant scan completed for {$source->name}. No videos found on this profile."));
 
             return response()->json([
                 'status' => 'success',

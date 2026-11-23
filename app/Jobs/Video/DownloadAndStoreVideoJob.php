@@ -33,6 +33,16 @@ class DownloadAndStoreVideoJob implements ShouldQueue
         \App\Services\Video\YtDlpService $ytDlp
     ): void {
         try {
+            // Check minimum video duration (must be >= 5 seconds)
+            if ($this->video->duration !== null && $this->video->duration < 5) {
+                Log::info("Aborting download for video ID {$this->video->id}: duration {$this->video->duration}s is less than 5 seconds.");
+                $this->video->update([
+                    'processing_status' => 'skipped',
+                    'processing_error' => "Video length is {$this->video->duration}s, which is less than the required minimum of 5 seconds.",
+                ]);
+                return;
+            }
+
             // 1. Mark as downloading
             $this->video->update(['processing_status' => 'downloading']);
 
@@ -82,9 +92,13 @@ class DownloadAndStoreVideoJob implements ShouldQueue
                 }
             }
 
-            // 4. Fallback for testing environments / mock streams
+            // 4. Fallback for testing environments only
             if ($binary === null || strlen($binary) === 0) {
-                $binary = base64_decode("AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAhtZGF0");
+                if (app()->environment('testing')) {
+                    $binary = base64_decode("AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAhtZGF0");
+                } else {
+                    throw new Exception("Unable to download media binary from {$targetUrl}. Both yt-dlp and direct HTTP extraction failed.");
+                }
             }
 
             $hash = hash('sha256', $binary);

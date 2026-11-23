@@ -46,6 +46,20 @@ class YtDlpServiceTest extends TestCase
         $this->assertEquals('generic', $this->service->normalizeExtractor('generic', 'https://vimeo.com/123'));
     }
 
+    public function test_get_user_agent_returns_standard_browser_agent(): void
+    {
+        $ua = $this->service->getUserAgent();
+        $this->assertNotEmpty($ua);
+        $this->assertStringContainsString('Mozilla/5.0', $ua);
+    }
+
+    public function test_extract_feed_returns_empty_array_for_invalid_url(): void
+    {
+        $result = $this->service->extractFeed('https://invalid-non-existent-domain-12345.com/channel');
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
     public function test_extract_metadata_returns_null_for_invalid_url(): void
     {
         $result = $this->service->extractMetadata('https://invalid-non-existent-domain-12345.com/video');
