@@ -108,7 +108,9 @@ class SourceController extends Controller
                     ? "Scan completed for {$source->name}. All latest videos are already up to date ({$totalCount} video(s) found in your library)."
                     : ($skipped > 0
                         ? "Scan completed for {$source->name}. {$skipped} video(s) older than 7 days were skipped."
-                        : "Instant scan completed for {$source->name}. No videos found on this profile."));
+                        : ($source->platform === 'facebook' && ! $ingestionService->isDirectVideoUrl($source->source_url)
+                            ? "Facebook Page profiles cannot be automatically crawled without a Meta session. Please use 'Scrape Video Link' to instantly ingest reels or set a direct video URL."
+                            : "Instant scan completed for {$source->name}. No videos found on this profile.")));
 
             return response()->json([
                 'status' => 'success',
