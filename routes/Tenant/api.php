@@ -40,6 +40,7 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     // 6. Connected Platform Accounts
     Route::get('platform-accounts', [PlatformAccountController::class, 'index'])->name('platform-accounts.index');
     Route::post('platform-accounts', [PlatformAccountController::class, 'store'])->name('platform-accounts.store');
+    Route::put('platform-accounts/{id}', [PlatformAccountController::class, 'update'])->name('platform-accounts.update');
     Route::delete('platform-accounts/{id}', [PlatformAccountController::class, 'destroy'])->name('platform-accounts.destroy');
     Route::get('platform-accounts/oauth/{platform}/redirect', [\App\Http\Controllers\Api\OAuthController::class, 'redirect'])->name('platform-accounts.oauth.redirect');
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\PlatformAccount\StorePlatformAccountRequest;
+use App\Http\Requests\Tenant\PlatformAccount\UpdatePlatformAccountRequest;
 use App\Models\TenantPlatformAccount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +58,64 @@ class PlatformAccountController extends Controller
             $account,
             ucfirst($account->platform) . ' account connected successfully.',
             201
+        );
+    }
+
+    public function update(UpdatePlatformAccountRequest $request, int $id): JsonResponse
+    {
+        $account = TenantPlatformAccount::findOrFail($id);
+        $validated = $request->validated();
+
+        $updateData = [];
+
+        if (array_key_exists('account_name', $validated)) {
+            $updateData['account_name'] = $validated['account_name'];
+        }
+
+        if (array_key_exists('account_handle', $validated)) {
+            $updateData['account_handle'] = $validated['account_handle'];
+        }
+
+        if (array_key_exists('external_account_id', $validated)) {
+            $updateData['external_account_id'] = $validated['external_account_id'];
+        }
+
+        if (array_key_exists('avatar_url', $validated)) {
+            $updateData['avatar_url'] = $validated['avatar_url'];
+        }
+
+        if (array_key_exists('status', $validated)) {
+            $updateData['status'] = $validated['status'];
+        }
+
+        if (!empty($validated['access_token'])) {
+            $updateData['encrypted_access_token'] = $validated['access_token'];
+            $updateData['last_validated_at'] = now();
+            if ($account->token_expires_at === null || $account->token_expires_at->isPast()) {
+                $updateData['token_expires_at'] = now()->addDays(60);
+            }
+        }
+
+        if (!empty($validated['refresh_token'])) {
+            $updateData['encrypted_refresh_token'] = $validated['refresh_token'];
+        }
+
+        $account->update($updateData);
+
+        return responseSuccess(
+            [
+                'id' => $account->id,
+                'platform' => $account->platform,
+                'account_name' => $account->account_name,
+                'account_handle' => $account->account_handle,
+                'avatar_url' => $account->avatar_url,
+                'status' => $account->status,
+                'token_expires_at' => $account->token_expires_at,
+                'is_expiring' => $account->isTokenExpiringSoon(),
+                'last_validated_at' => $account->last_validated_at,
+                'external_account_id' => $account->external_account_id,
+            ],
+            'Platform account updated successfully.'
         );
     }
 
