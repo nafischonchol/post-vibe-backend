@@ -180,6 +180,13 @@ class YtDlpService
 
             $platform = $this->normalizeExtractor($data['extractor_key'] ?? $data['extractor'] ?? '', $url);
 
+            $duration = null;
+            if (isset($data['duration']) && $data['duration'] !== null) {
+                $duration = (int) round((float) $data['duration']);
+            } elseif (! empty($data['duration_string'])) {
+                $duration = $this->parseDurationString((string) $data['duration_string']);
+            }
+
             return [
                 'platform' => $platform,
                 'source_post_id' => (string) ($data['id'] ?? md5($url)),
@@ -189,7 +196,7 @@ class YtDlpService
                 'original_hashtags' => $hashtags,
                 'thumbnail_url' => $data['thumbnail'] ?? null,
                 'download_url' => null, // Managed directly by downloadVideo()
-                'duration' => isset($data['duration']) ? (int) $data['duration'] : null,
+                'duration' => $duration,
                 'author' => $data['uploader'] ?? $data['channel'] ?? $data['uploader_id'] ?? null,
                 'source_published_at' => $publishedAt,
             ];
@@ -332,9 +339,12 @@ class YtDlpService
                     continue;
                 }
 
-                // Determine video post URL
-                $postUrl = $entry['url'] ?? null;
-                if (empty($postUrl) || ! filter_var($postUrl, FILTER_VALIDATE_URL)) {
+                // Determine video post URL (prioritize human-facing webpage_url over raw CDN stream URLs)
+                $postUrl = ! empty($entry['webpage_url']) && filter_var($entry['webpage_url'], FILTER_VALIDATE_URL)
+                    ? $entry['webpage_url']
+                    : ($entry['url'] ?? null);
+
+                if (empty($postUrl) || ! filter_var($postUrl, FILTER_VALIDATE_URL) || preg_match('/\.(mp4|mov|webm)(\?.*)?$/i', $postUrl)) {
                     $platform = $this->normalizeExtractor($entry['extractor_key'] ?? $entry['extractor'] ?? $data['extractor_key'] ?? $data['extractor'] ?? '', $url);
                     if ($platform === 'tiktok') {
                         $uploader = $entry['uploader'] ?? $data['uploader'] ?? $entry['channel'] ?? '';
@@ -343,8 +353,10 @@ class YtDlpService
                             : "https://www.tiktok.com/video/{$postId}";
                     } elseif ($platform === 'youtube') {
                         $postUrl = "https://www.youtube.com/watch?v={$postId}";
+                    } elseif ($platform === 'facebook') {
+                        $postUrl = "https://www.facebook.com/watch/?v={$postId}";
                     } else {
-                        $postUrl = $entry['webpage_url'] ?? $url;
+                        $postUrl = $entry['webpage_url'] ?? $entry['original_url'] ?? $url;
                     }
                 }
 
@@ -378,7 +390,12 @@ class YtDlpService
                         substr($entry['upload_date'], 6, 2) . ' 00:00:00';
                 }
 
-                $duration = isset($entry['duration']) && $entry['duration'] !== null ? (int) $entry['duration'] : null;
+                $duration = null;
+                if (isset($entry['duration']) && $entry['duration'] !== null) {
+                    $duration = (int) round((float) $entry['duration']);
+                } elseif (! empty($entry['duration_string'])) {
+                    $duration = $this->parseDurationString((string) $entry['duration_string']);
+                }
 
                 // Skip non-video posts (e.g. TikTok photo mode) and videos shorter than 5 seconds
                 if ($duration === null || $duration < 5) {
@@ -431,5 +448,28 @@ class YtDlpService
         }
 
         return 'generic';
+    }
+
+    /**
+     * Parse duration string (e.g. "10", "0:10", "1:30", "01:15:30") into integer seconds.
+     */
+    public function parseDurationString(?string $str): ?int
+    {
+        if (empty($str)) {
+            return null;
+        }
+
+        $parts = array_map('intval', explode(':', trim($str)));
+        if (count($parts) === 1) {
+            return $parts[0] > 0 ? $parts[0] : null;
+        }
+        if (count($parts) === 2) {
+            return ($parts[0] * 60) + $parts[1];
+        }
+        if (count($parts) === 3) {
+            return ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
+        }
+
+        return null;
     }
 }

@@ -65,4 +65,14 @@ class YtDlpServiceTest extends TestCase
         $result = $this->service->extractMetadata('https://invalid-non-existent-domain-12345.com/video');
         $this->assertNull($result);
     }
+
+    public function test_parse_duration_string_handles_various_formats(): void
+    {
+        $this->assertEquals(10, $this->service->parseDurationString('10'));
+        $this->assertEquals(10, $this->service->parseDurationString('0:10'));
+        $this->assertEquals(90, $this->service->parseDurationString('1:30'));
+        $this->assertEquals(3665, $this->service->parseDurationString('01:01:05'));
+        $this->assertNull($this->service->parseDurationString(''));
+        $this->assertNull($this->service->parseDurationString(null));
+    }
 }

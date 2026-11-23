@@ -35,10 +35,14 @@ class VideoIngestionService
 
         $scraped = $this->scraper->scrape($targetUrl);
 
-        // Reject if duration is less than 5 seconds
+        // Reject if duration is known and less than 5 seconds
         $duration = isset($scraped['duration']) && $scraped['duration'] !== null ? (int) $scraped['duration'] : null;
-        if ($duration === null || $duration < 5) {
-            throw new Exception("Video length is " . ($duration !== null ? "{$duration}s" : "0s") . ", which is less than the required minimum of 5 seconds.");
+        if ($duration !== null && $duration < 5) {
+            throw new Exception("Video length is {$duration}s, which is less than the required minimum of 5 seconds.");
+        }
+        if ($duration === null) {
+            $duration = 30;
+            $scraped['duration'] = 30;
         }
 
         // 1. Check duplicate within tenant
@@ -169,26 +173,57 @@ class VideoIngestionService
         }
 
         $parsed = parse_url($url);
+        $host = strtolower($parsed['host'] ?? '');
         $path = $parsed['path'] ?? '';
         $query = $parsed['query'] ?? '';
 
-        // TikTok direct video (/video/123456...)
-        if (preg_match('#/video/\d+#', $path)) {
+        // TikTok direct video
+        if (str_contains($host, 'tiktok.com')) {
+            if (preg_match('#/video/\d+#', $path) || preg_match('#/t/[A-Za-z0-9]+#', $path)) {
+                return true;
+            }
+        }
+        if (str_contains($host, 'vm.tiktok.com') || str_contains($host, 'vt.tiktok.com')) {
             return true;
         }
 
         // YouTube direct video/short
-        if (str_contains($path, '/shorts/') || str_contains($path, '/watch') || str_contains($query, 'v=')) {
+        if (str_contains($host, 'youtu.be')) {
             return true;
+        }
+        if (str_contains($host, 'youtube.com')) {
+            if (str_contains($path, '/shorts/') || str_contains($path, '/watch') || str_contains($query, 'v=')) {
+                return true;
+            }
         }
 
         // Instagram direct post/reel
-        if (preg_match('#/(reel|p|tv)/[^/]+#', $path)) {
-            return true;
+        if (str_contains($host, 'instagram.com') || str_contains($host, 'instagr.am')) {
+            if (preg_match('#/(reel|reels|p|tv)/[^/]+#', $path) || str_contains($path, '/share/reel/')) {
+                return true;
+            }
         }
 
-        // Facebook direct video
-        if (str_contains($path, '/videos/') || str_contains($path, '/reel/') || str_contains($path, '/watch')) {
+        // Facebook direct video / reel / share
+        if (str_contains($host, 'facebook.com') || str_contains($host, 'fb.watch')) {
+            if (str_contains($host, 'fb.watch')) {
+                return true;
+            }
+            if (str_contains($path, '/videos/') ||
+                str_contains($path, '/reel/') ||
+                str_contains($path, '/reels/') ||
+                str_contains($path, '/watch') ||
+                str_contains($path, '/share/r/') ||
+                str_contains($path, '/share/v/') ||
+                str_contains($path, '/share/p/') ||
+                preg_match('#/posts/[^/]+#', $path) ||
+                str_contains($query, 'v=')) {
+                return true;
+            }
+        }
+
+        // Direct media files
+        if (preg_match('/\.(mp4|mov|webm)$/i', $path)) {
             return true;
         }
 
