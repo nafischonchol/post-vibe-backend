@@ -45,6 +45,7 @@ return [
         'binary_path' => env('YT_DLP_PATH', base_path('bin/yt-dlp')),
         'timeout' => (int) env('YT_DLP_TIMEOUT', 300),
         'max_filesize' => env('YT_DLP_MAX_FILESIZE', '150M'),
+        'cookies_path' => env('YT_DLP_COOKIES_PATH', storage_path('app/cookies.txt')),
     ],
 
 ];

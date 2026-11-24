@@ -54,7 +54,7 @@ class OAuthController extends Controller
         $state = $request->query('state');
         $error = $request->query('error');
 
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:3092');
+        $frontendUrl = config('app.frontend_url', 'https://postvibe.mohima.skin');
 
         if ($error || empty($code) || empty($state)) {
             $errorDesc = $request->query('error_description') ?: $error ?: 'Missing OAuth authorization parameters.';

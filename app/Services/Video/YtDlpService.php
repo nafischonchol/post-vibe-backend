@@ -22,6 +22,19 @@ class YtDlpService
     }
 
     /**
+     * Get path to cookies file if configured and exists.
+     */
+    public function getCookiesPath(): ?string
+    {
+        $path = config('services.yt_dlp.cookies_path', storage_path('app/cookies.txt'));
+        if ($path && File::isFile($path) && filesize($path) > 0) {
+            return $path;
+        }
+
+        return null;
+    }
+
+    /**
      * Resolve the yt-dlp binary path.
      */
     public function getBinaryPath(): ?string
@@ -139,8 +152,14 @@ class YtDlpService
             '--no-warnings',
             '--no-playlist',
             '--skip-download',
-            $url,
         ];
+
+        if ($cookies = $this->getCookiesPath()) {
+            $command[] = '--cookies';
+            $command[] = $cookies;
+        }
+
+        $command[] = $url;
 
         try {
             $timeout = (int) config('services.yt_dlp.timeout', 60);
@@ -246,8 +265,14 @@ class YtDlpService
             '-f', 'best[ext=mp4]/best',
             '--max-filesize', $maxSize,
             '-o', $outputPath,
-            $url,
         ];
+
+        if ($cookies = $this->getCookiesPath()) {
+            $command[] = '--cookies';
+            $command[] = $cookies;
+        }
+
+        $command[] = $url;
 
         $process = new Process($command);
         $process->setTimeout($timeout);
@@ -302,8 +327,14 @@ class YtDlpService
             '--playlist-end', (string) $limit,
             '--no-warnings',
             '-J',
-            $url,
         ];
+
+        if ($cookies = $this->getCookiesPath()) {
+            $command[] = '--cookies';
+            $command[] = $cookies;
+        }
+
+        $command[] = $url;
 
         try {
             $timeout = (int) config('services.yt_dlp.feed_timeout', 60);

@@ -43,16 +43,41 @@ class TikTokGateway implements PlatformGatewayInterface
             throw new Exception("Unable to load video binary from storage: {$video->temporary_storage_path}");
         }
 
+        // Query creator publishing info to dynamically match allowed privacy levels and interactions
+        $privacyLevel = 'PUBLIC_TO_EVERYONE';
+        $disableComment = false;
+        $disableDuet = false;
+        $disableStitch = false;
+
+        try {
+            $creatorRes = Http::withHeaders([
+                'Authorization' => "Bearer {$accessToken}",
+                'Content-Type' => 'application/json; charset=UTF-8',
+            ])->post('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', (object) []);
+
+            if ($creatorRes->successful() && $creatorRes->json('error.code') === 'ok') {
+                $options = $creatorRes->json('data.privacy_level_options') ?? [];
+                if (!in_array($privacyLevel, $options)) {
+                    $privacyLevel = in_array('SELF_ONLY', $options) ? 'SELF_ONLY' : ($options[0] ?? 'SELF_ONLY');
+                }
+                $disableComment = (bool) $creatorRes->json('data.comment_disabled', false);
+                $disableDuet = (bool) $creatorRes->json('data.duet_disabled', false);
+                $disableStitch = (bool) $creatorRes->json('data.stitch_disabled', false);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("TikTok creator_info query failed: " . $e->getMessage());
+        }
+
         $initRes = Http::withHeaders([
             'Authorization' => "Bearer {$accessToken}",
             'Content-Type' => 'application/json; charset=UTF-8',
         ])->post('https://open.tiktokapis.com/v2/post/publish/video/init/', [
             'post_info' => [
                 'title' => substr($caption, 0, 2200),
-                'privacy_level' => 'PUBLIC_TO_EVERYONE',
-                'disable_duet' => false,
-                'disable_stitch' => false,
-                'disable_comment' => false,
+                'privacy_level' => $privacyLevel,
+                'disable_duet' => $disableDuet,
+                'disable_stitch' => $disableStitch,
+                'disable_comment' => $disableComment,
                 'video_cover_timestamp_ms' => 1000,
             ],
             'source_info' => [

@@ -190,9 +190,7 @@ class PlatformOAuthService
 
         // Fetch TikTok user profile
         $userRes = Http::withToken($accessToken)
-            ->post('https://open.tiktokapis.com/v2/user/info/', [
-                'fields' => ['open_id', 'union_id', 'avatar_url', 'display_name'],
-            ]);
+            ->get('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name');
 
         $userData = $userRes->json('data.user') ?? [];
         $displayName = $userData['display_name'] ?? 'TikTok Creator';

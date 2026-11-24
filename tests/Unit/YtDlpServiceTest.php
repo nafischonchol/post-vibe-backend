@@ -75,4 +75,20 @@ class YtDlpServiceTest extends TestCase
         $this->assertNull($this->service->parseDurationString(''));
         $this->assertNull($this->service->parseDurationString(null));
     }
+
+    public function test_get_cookies_path(): void
+    {
+        // When file doesn't exist, returns null
+        config(['services.yt_dlp.cookies_path' => '/tmp/non_existent_cookies_file_12345.txt']);
+        $this->assertNull($this->service->getCookiesPath());
+
+        // When file exists and has content
+        $tempCookieFile = tempnam(sys_get_temp_dir(), 'test_cookies');
+        file_put_contents($tempCookieFile, "# Netscape HTTP Cookie File\n.instagram.com TRUE / FALSE 1999999999 sessionid test");
+        config(['services.yt_dlp.cookies_path' => $tempCookieFile]);
+
+        $this->assertEquals($tempCookieFile, $this->service->getCookiesPath());
+
+        @unlink($tempCookieFile);
+    }
 }
