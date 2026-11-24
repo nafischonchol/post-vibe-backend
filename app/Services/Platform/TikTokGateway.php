@@ -131,9 +131,11 @@ class TikTokGateway implements PlatformGatewayInterface
             throw new Exception("TikTok binary transfer failed: " . $uploadRes->body());
         }
 
+        $handle = ltrim($account->account_handle ?: 'creator', '@');
+
         return [
             'external_post_id' => $publishId,
-            'external_post_url' => "https://tiktok.com/@{$account->account_handle}/video/{$publishId}",
+            'external_post_url' => "https://www.tiktok.com/@{$handle}/video/{$publishId}",
             'raw' => $initRes->json(),
         ];
     }
@@ -153,10 +155,11 @@ class TikTokGateway implements PlatformGatewayInterface
         ]);
 
         if ($res->successful() && $res->json('data.status') === 'PUBLISH_COMPLETE') {
+            $handle = ltrim($account->account_handle ?: 'creator', '@');
             return [
                 'published' => true,
                 'external_post_id' => $externalPostId,
-                'external_post_url' => "https://tiktok.com/@{$account->account_handle}/video/{$externalPostId}",
+                'external_post_url' => "https://www.tiktok.com/@{$handle}/video/{$externalPostId}",
             ];
         }
 
