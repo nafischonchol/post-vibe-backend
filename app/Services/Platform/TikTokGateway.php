@@ -44,7 +44,9 @@ class TikTokGateway implements PlatformGatewayInterface
         }
 
         // Query creator publishing info to dynamically match allowed privacy levels and interactions
-        $privacyLevel = 'PUBLIC_TO_EVERYONE';
+        $app = PlatformApplication::where('platform', 'tiktok')->first();
+        $isSandbox = ($app?->configuration['mode'] ?? '') === 'sandbox' || str_starts_with($app?->client_id ?? '', 'sb');
+        $privacyLevel = $isSandbox ? 'SELF_ONLY' : 'PUBLIC_TO_EVERYONE';
         $disableComment = false;
         $disableDuet = false;
         $disableStitch = false;
@@ -80,6 +82,37 @@ class TikTokGateway implements PlatformGatewayInterface
                 'disable_comment' => $disableComment,
                 'video_cover_timestamp_ms' => 1000,
             ],
+            'source_info' => [
+                'source' => 'FILE_UPLOAD',
+                'video_size' => strlen($mediaBinary),
+                'chunk_size' => strlen($mediaBinary),
+                'total_chunk_count' => 1,
+            ],
+        ]);
+
+        // Auto-recover if rejected because client is in sandbox / unaudited
+        if (! $initRes->successful() && $initRes->json('error.code') === 'unaudited_client_can_only_post_to_private_accounts' && $privacyLevel !== 'SELF_ONLY') {
+            $privacyLevel = 'SELF_ONLY';
+            $initRes = Http::withHeaders([
+                'Authorization' => "Bearer {$accessToken}",
+                'Content-Type' => 'application/json; charset=UTF-8',
+            ])->post('https://open.tiktokapis.com/v2/post/publish/video/init/', [
+                'post_info' => [
+                    'title' => substr($caption, 0, 2200),
+                    'privacy_level' => 'SELF_ONLY',
+                    'disable_duet' => $disableDuet,
+                    'disable_stitch' => $disableStitch,
+                    'disable_comment' => $disableComment,
+                    'video_cover_timestamp_ms' => 1000,
+                ],
+                'source_info' => [
+                    'source' => 'FILE_UPLOAD',
+                    'video_size' => strlen($mediaBinary),
+                    'chunk_size' => strlen($mediaBinary),
+                    'total_chunk_count' => 1,
+                ],
+            ]);
+        }
             'source_info' => [
                 'source' => 'FILE_UPLOAD',
                 'video_size' => strlen($mediaBinary),
