@@ -60,6 +60,14 @@ class ProcessVideoAiJob implements ShouldQueue
                 'processing_error' => null,
             ]);
 
+            // 4. Trigger auto-publishing if enabled for the tenant
+            try {
+                $batchService = app(\App\Services\Publishing\PublishingBatchService::class);
+                $batchService->autoPublishVideo($this->video->fresh());
+            } catch (Exception $autoPublishError) {
+                Log::warning("Auto-publishing pipeline exception for video ID {$this->video->id}: " . $autoPublishError->getMessage());
+            }
+
         } catch (Exception $e) {
             Log::error("ProcessVideoAiJob failed for video ID {$this->video->id}: " . $e->getMessage());
 

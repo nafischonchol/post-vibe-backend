@@ -8,12 +8,15 @@ use App\Models\PublishingSchedule;
 use App\Models\QuotaReservation;
 use App\Models\QuotaReservationItem;
 use App\Models\Tenant;
+use App\Models\TenantPlatformAccount;
+use App\Models\TenantPublishingSetting;
 use App\Models\TenantUser;
 use App\Models\TransactionalOutbox;
 use App\Models\Video;
 use App\Models\VideoPlatformMetadata;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class PublishingBatchService
@@ -162,5 +165,63 @@ class PublishingBatchService
             $batch->update(['batch_status' => 'cancelled']);
             return $batch;
         });
+    }
+
+    /**
+     * Automatically publish a ready video to the tenant's connected active platform accounts.
+     */
+    public function autoPublishVideo(Video $video): ?PublishingBatch
+    {
+        // 1. Ensure video is ready and has valid storage binary
+        if ($video->processing_status !== 'ready' || empty($video->temporary_storage_path)) {
+            return null;
+        }
+
+        // 2. Prevent duplicate publishing batches
+        $alreadyBatched = PublishingBatch::withoutGlobalScopes()
+            ->where('video_id', $video->id)
+            ->whereIn('batch_status', ['scheduled', 'processing', 'completed', 'partially_completed'])
+            ->exists();
+
+        if ($alreadyBatched) {
+            return null;
+        }
+
+        // 3. Check tenant settings: must have automatic_publishing_enabled = true
+        $setting = TenantPublishingSetting::withoutGlobalScopes()
+            ->where('tenant_id', $video->tenant_id)
+            ->first();
+
+        if (! $setting || ! $setting->automatic_publishing_enabled) {
+            return null;
+        }
+
+        // 4. Find all active destination platform accounts for this tenant
+        $activeAccounts = TenantPlatformAccount::withoutGlobalScopes()
+            ->where('tenant_id', $video->tenant_id)
+            ->where('status', 'active')
+            ->get();
+
+        if ($activeAccounts->isEmpty()) {
+            Log::info("Auto-publish skipped for video ID {$video->id}: no active platform accounts connected.");
+            return null;
+        }
+
+        $targets = [];
+        foreach ($activeAccounts as $account) {
+            $targets[] = [
+                'platform' => $account->platform,
+                'account_id' => $account->id,
+            ];
+        }
+
+        $tenant = $video->tenant ?: Tenant::withoutGlobalScopes()->find($video->tenant_id);
+        if (! $tenant) {
+            return null;
+        }
+
+        Log::info("Auto-publishing video ID {$video->id} for tenant ID {$tenant->id} to " . count($targets) . " target(s)...");
+
+        return $this->createBatch($tenant, $video, $targets, now(), 'automatic');
     }
 }

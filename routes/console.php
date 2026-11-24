@@ -17,6 +17,12 @@ Schedule::command('sources:scan --limit=20')
     ->withoutOverlapping(15)
     ->runInBackground();
 
+// 2b. Auto-Publish Ready Videos: Dispatch any pending ready videos for tenants with auto-publishing enabled
+Schedule::command('videos:auto-publish --limit=5')
+    ->everyTwoMinutes()
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
 // 3. Social Platform Analytics Synchronizer: Refresh views, likes, comments & engagement
 Schedule::command('analytics:sync-platforms --limit=50')
     ->hourly()
