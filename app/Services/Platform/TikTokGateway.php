@@ -113,13 +113,6 @@ class TikTokGateway implements PlatformGatewayInterface
                 ],
             ]);
         }
-            'source_info' => [
-                'source' => 'FILE_UPLOAD',
-                'video_size' => strlen($mediaBinary),
-                'chunk_size' => strlen($mediaBinary),
-                'total_chunk_count' => 1,
-            ],
-        ]);
 
         if (! $initRes->successful() || $initRes->json('error.code') !== 'ok') {
             throw new Exception("TikTok post initialization failed: " . $initRes->body());
