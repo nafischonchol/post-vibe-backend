@@ -39,7 +39,7 @@ class FacebookGateway implements PlatformGatewayInterface
         }
 
         // 1. Initialize Reels Upload Session
-        $initRes = Http::post("https://graph.facebook.com/v20.0/{$pageId}/video_reels", [
+        $initRes = Http::timeout(60)->connectTimeout(15)->post("https://graph.facebook.com/v20.0/{$pageId}/video_reels", [
             'upload_phase' => 'start',
             'access_token' => $accessToken,
         ]);
@@ -57,7 +57,7 @@ class FacebookGateway implements PlatformGatewayInterface
             throw new Exception("Unable to load video binary from storage: {$video->temporary_storage_path}");
         }
 
-        $uploadRes = Http::withHeaders([
+        $uploadRes = Http::timeout(300)->connectTimeout(30)->withHeaders([
             'Authorization' => "OAuth {$accessToken}",
             'offset' => '0',
             'file_size' => strlen($mediaBinary),
@@ -68,7 +68,7 @@ class FacebookGateway implements PlatformGatewayInterface
         }
 
         // 3. Finish / Publish Reels Phase
-        $finishRes = Http::post("https://graph.facebook.com/v20.0/{$pageId}/video_reels", [
+        $finishRes = Http::timeout(120)->connectTimeout(30)->post("https://graph.facebook.com/v20.0/{$pageId}/video_reels", [
             'upload_phase' => 'finish',
             'access_token' => $accessToken,
             'video_id' => $videoId,

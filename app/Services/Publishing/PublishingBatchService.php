@@ -37,6 +37,33 @@ class PublishingBatchService
         ?TenantUser $creator = null
     ): PublishingBatch {
         $platforms = array_unique(array_column($targets, 'platform'));
+        // Prevent concurrent duplicate batches for the same video
+        $existingActiveBatch = PublishingBatch::withoutGlobalScopes()
+            ->where('video_id', $video->id)
+            ->whereIn('batch_status', ['scheduled', 'processing'])
+            ->first();
+
+        if ($existingActiveBatch) {
+            throw new Exception("A publishing batch (#{$existingActiveBatch->id}) is already {$existingActiveBatch->batch_status} for this video.");
+        }
+
+        // Prevent republishing to platforms where this video was already successfully published
+        $alreadyPublishedPlatforms = PublishingSchedule::whereHas('batch', fn($q) => $q->where('video_id', $video->id))
+            ->whereIn('platform', $platforms)
+            ->where('upload_status', 'published')
+            ->pluck('platform')
+            ->unique()
+            ->toArray();
+
+        if (! empty($alreadyPublishedPlatforms)) {
+            $targets = array_values(array_filter($targets, fn($t) => ! in_array($t['platform'], $alreadyPublishedPlatforms)));
+            $platforms = array_unique(array_column($targets, 'platform'));
+
+            if (empty($targets)) {
+                throw new Exception("This video has already been published to " . implode(', ', $alreadyPublishedPlatforms) . ".");
+            }
+        }
+
         $scheduledTime = $scheduledAt ?: now();
         $idempotencyKey = hash('sha256', "{$tenant->id}:{$video->id}:" . json_encode($targets) . ":{$scheduledTime->timestamp}");
 
@@ -180,7 +207,14 @@ class PublishingBatchService
         // 2. Prevent duplicate publishing batches
         $alreadyBatched = PublishingBatch::withoutGlobalScopes()
             ->where('video_id', $video->id)
-            ->whereIn('batch_status', ['scheduled', 'processing', 'completed', 'partially_completed'])
+            ->whereIn('batch_status', [
+                'scheduled',
+                'processing',
+                'completed',
+                'partially_completed',
+                'published',
+                'partially_published',
+            ])
             ->exists();
 
         if ($alreadyBatched) {

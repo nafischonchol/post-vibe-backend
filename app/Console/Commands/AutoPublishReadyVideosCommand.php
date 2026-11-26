@@ -28,7 +28,14 @@ class AutoPublishReadyVideosCommand extends Command
                 $sub->select('id')
                     ->from('publishing_batches')
                     ->whereColumn('publishing_batches.video_id', 'videos.id')
-                    ->whereIn('publishing_batches.batch_status', ['scheduled', 'processing', 'completed', 'partially_completed']);
+                    ->whereIn('publishing_batches.batch_status', [
+                        'scheduled',
+                        'processing',
+                        'completed',
+                        'partially_completed',
+                        'published',
+                        'partially_published',
+                    ]);
             })
             ->orderBy('id', 'asc');
 

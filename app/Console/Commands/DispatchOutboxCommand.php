@@ -38,12 +38,22 @@ class DispatchOutboxCommand extends Command
     protected function dispatchCycle(int $limit): void
     {
         $events = DB::transaction(function () use ($limit) {
-            return TransactionalOutbox::where('status', 'pending')
+            $pendingEvents = TransactionalOutbox::where('status', 'pending')
                 ->where('available_at', '<=', now())
                 ->orderBy('id')
                 ->limit($limit)
                 ->lockForUpdate()
                 ->get();
+
+            if ($pendingEvents->isEmpty()) {
+                return $pendingEvents;
+            }
+
+            // Atomically mark events as processing inside the transaction so concurrent workers cannot claim them
+            TransactionalOutbox::whereIn('id', $pendingEvents->pluck('id'))
+                ->update(['status' => 'processing']);
+
+            return $pendingEvents;
         });
 
         if ($events->isEmpty()) {
@@ -62,7 +72,8 @@ class DispatchOutboxCommand extends Command
                         $batch->update(['batch_status' => 'processing']);
 
                         foreach ($batch->schedules as $schedule) {
-                            if (in_array($schedule->upload_status, ['pending', 'scheduled', 'queued'])) {
+                            if (in_array($schedule->upload_status, ['pending', 'scheduled'])) {
+                                $schedule->update(['upload_status' => 'queued']);
                                 UploadToPlatformJob::dispatch($schedule)->onQueue('publishing');
                             }
                         }

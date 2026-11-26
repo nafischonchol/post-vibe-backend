@@ -31,9 +31,37 @@ class UploadToPlatformJob implements ShouldQueue
         MediaStorageService $storage,
         \App\Services\Platform\PlatformGatewayManager $gatewayManager
     ): void {
-        // 1. Idempotency Check: Do not re-upload if already published
-        if ($this->schedule->upload_status === 'published') {
-            Log::info("PublishingSchedule ID {$this->schedule->id} is already published. Skipping.");
+        $this->schedule->refresh();
+
+        // 1. Idempotency Check: Do not re-upload if already published or post ID exists
+        if ($this->schedule->upload_status === 'published' || ! empty($this->schedule->external_post_id)) {
+            Log::info("PublishingSchedule ID {$this->schedule->id} is already published. Skipping duplicate upload.");
+            return;
+        }
+
+        $video = $this->schedule->batch?->video;
+        $platform = $this->schedule->platform;
+
+        if (! $video) {
+            throw new Exception("Video not found for schedule ID {$this->schedule->id}");
+        }
+
+        // Check if this video has already been published on this platform
+        $alreadyPublishedSchedule = PublishingSchedule::where('platform', $platform)
+            ->where('upload_status', 'published')
+            ->whereNotNull('external_post_id')
+            ->where('id', '!=', $this->schedule->id)
+            ->whereHas('batch', fn($q) => $q->where('video_id', $video->id))
+            ->first();
+
+        if ($alreadyPublishedSchedule) {
+            Log::info("Video ID {$video->id} is already published on {$platform} via schedule #{$alreadyPublishedSchedule->id}. Marking schedule #{$this->schedule->id} as published to avoid duplication.");
+            $this->schedule->update([
+                'upload_status' => 'published',
+                'external_post_id' => $alreadyPublishedSchedule->external_post_id,
+                'external_post_url' => $alreadyPublishedSchedule->external_post_url,
+                'published_at' => now(),
+            ]);
             return;
         }
 
@@ -43,8 +71,6 @@ class UploadToPlatformJob implements ShouldQueue
                 'attempt_count' => $this->schedule->attempt_count + 1,
             ]);
 
-            $video = $this->schedule->batch->video;
-            $platform = $this->schedule->platform;
             $metadata = $this->schedule->metadata;
             $account = $this->schedule->platformAccount;
 
