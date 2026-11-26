@@ -195,9 +195,9 @@ class PublishingBatchService
     }
 
     /**
-     * Automatically publish a ready video to the tenant's connected active platform accounts.
+     * Automatically publish a ready video to the tenant's connected active platform accounts with spaced intervals.
      */
-    public function autoPublishVideo(Video $video): ?PublishingBatch
+    public function autoPublishVideo(Video $video, ?int $customIntervalMinutes = null): ?PublishingBatch
     {
         // 1. Ensure video is ready and has valid storage binary
         if ($video->processing_status !== 'ready' || empty($video->temporary_storage_path)) {
@@ -254,8 +254,46 @@ class PublishingBatchService
             return null;
         }
 
-        Log::info("Auto-publishing video ID {$video->id} for tenant ID {$tenant->id} to " . count($targets) . " target(s)...");
+        $interval = $customIntervalMinutes ?? $setting->publishing_interval_minutes ?? 60;
+        $scheduledTime = $this->calculateNextPublishTime($tenant, $interval);
 
-        return $this->createBatch($tenant, $video, $targets, now(), 'automatic');
+        Log::info("Auto-publishing video ID {$video->id} for tenant ID {$tenant->id} to " . count($targets) . " target(s) scheduled at {$scheduledTime->toIso8601String()} (interval: {$interval}m)...");
+
+        return $this->createBatch($tenant, $video, $targets, $scheduledTime, 'automatic');
+    }
+
+    /**
+     * Calculate the next scheduled publishing time to enforce a healthy interval between posts.
+     */
+    public function calculateNextPublishTime(Tenant $tenant, int $intervalMinutes = 60): Carbon
+    {
+        $intervalMinutes = max(15, $intervalMinutes);
+
+        // Find the latest scheduled or completed batch for this tenant
+        $latestBatch = PublishingBatch::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('batch_status', [
+                'scheduled',
+                'processing',
+                'completed',
+                'partially_completed',
+                'published',
+                'partially_published',
+            ])
+            ->orderByDesc('intended_publish_at')
+            ->first();
+
+        if (! $latestBatch || ! $latestBatch->intended_publish_at) {
+            return now();
+        }
+
+        $nextSlot = Carbon::parse($latestBatch->intended_publish_at)->addMinutes($intervalMinutes);
+
+        // If the calculated next slot is in the past, publish now
+        if ($nextSlot->isPast()) {
+            return now();
+        }
+
+        return $nextSlot;
     }
 }

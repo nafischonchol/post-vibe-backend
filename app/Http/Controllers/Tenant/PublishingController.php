@@ -83,4 +83,40 @@ class PublishingController extends Controller
             'resources' => $batch,
         ]);
     }
+
+    public function getSettings(Request $request): JsonResponse
+    {
+        $tenant = $request->user()->tenant;
+        $setting = \App\Models\TenantPublishingSetting::firstOrCreate(
+            ['tenant_id' => $tenant->id],
+            [
+                'automatic_publishing_enabled' => false,
+                'publishing_interval_minutes' => 60,
+                'manual_publishing_enabled' => true,
+                'timezone' => $tenant->timezone ?: 'UTC',
+            ]
+        );
+
+        return responseSuccess($setting, 'Publishing settings retrieved successfully');
+    }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'automatic_publishing_enabled' => ['sometimes', 'boolean'],
+            'publishing_interval_minutes' => ['sometimes', 'integer', 'min:15', 'max:1440'],
+            'manual_publishing_enabled' => ['sometimes', 'boolean'],
+            'timezone' => ['sometimes', 'string', 'max:50'],
+            'preferred_days' => ['nullable', 'array'],
+            'preferred_time_windows' => ['nullable', 'array'],
+        ]);
+
+        $tenant = $request->user()->tenant;
+        $setting = \App\Models\TenantPublishingSetting::updateOrCreate(
+            ['tenant_id' => $tenant->id],
+            $validated
+        );
+
+        return responseSuccess($setting, 'Publishing settings updated successfully');
+    }
 }

@@ -45,6 +45,8 @@ Route::middleware(['auth:tenant', 'tenant.check'])->group(function () {
     Route::get('platform-accounts/oauth/{platform}/redirect', [\App\Http\Controllers\Api\OAuthController::class, 'redirect'])->name('platform-accounts.oauth.redirect');
 
     // 7. Publishing & Batches
+    Route::get('publishing/settings', [PublishingController::class, 'getSettings'])->name('publishing.settings.get');
+    Route::put('publishing/settings', [PublishingController::class, 'updateSettings'])->name('publishing.settings.update');
     Route::get('publishing/batches', [PublishingController::class, 'index'])->name('publishing.batches.index');
     Route::post('publishing/batches', [PublishingController::class, 'store'])->name('publishing.batches.store');
     Route::get('publishing/batches/{id}', [PublishingController::class, 'show'])->name('publishing.batches.show');

@@ -12,14 +12,15 @@ use Illuminate\Support\Facades\Log;
 
 class AutoPublishReadyVideosCommand extends Command
 {
-    protected $signature = 'videos:auto-publish {--tenant_id=} {--limit=5} {--force : Auto-publish even if tenant automatic_publishing_enabled is false}';
-    protected $description = 'Automatically schedule publishing batches for ready videos that have not yet been published';
+    protected $signature = 'videos:auto-publish {--tenant_id=} {--limit=5} {--interval= : Spaced interval between publications in minutes} {--force : Auto-publish even if tenant automatic_publishing_enabled is false}';
+    protected $description = 'Automatically schedule publishing batches for ready videos with spaced intervals';
 
     public function handle(PublishingBatchService $batchService): int
     {
         $limit = max(1, (int) $this->option('limit'));
         $tenantId = $this->option('tenant_id');
         $force = (bool) $this->option('force');
+        $customInterval = $this->option('interval') !== null ? max(15, (int) $this->option('interval')) : null;
 
         $query = Video::withoutGlobalScopes()
             ->where('processing_status', 'ready')
@@ -63,10 +64,11 @@ class AutoPublishReadyVideosCommand extends Command
             }
 
             try {
-                $batch = $batchService->autoPublishVideo($video);
+                $batch = $batchService->autoPublishVideo($video, $customInterval);
                 if ($batch) {
                     $publishedCount++;
-                    $this->info("Successfully dispatched auto-publish batch #{$batch->id} for video ID {$video->id} (Tenant {$video->tenant_id}).");
+                    $scheduledAtStr = $batch->intended_publish_at ? $batch->intended_publish_at->toDateTimeString() : 'immediately';
+                    $this->info("Successfully scheduled auto-publish batch #{$batch->id} for video ID {$video->id} at {$scheduledAtStr} (Tenant {$video->tenant_id}).");
                 }
             } catch (Exception $e) {
                 $this->error("Failed to auto-publish video ID {$video->id}: " . $e->getMessage());
